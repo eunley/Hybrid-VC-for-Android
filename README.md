@@ -1,5 +1,7 @@
 # Hybrid VC for Android
 
+简体中文 | [English](README.en.md)
+
 一款面向 Android 的免费变声器，支持文件转换、实时变声、快捷录音和本地 HTTP 接口。
 
 项目参考了 [ultimate-rvc-mobile](https://github.com/Sharl210/ultimate-rvc-mobile) 的模型使用方案，并针对手机端进行了优化与加速。当前采用通用 HuBERT、RMVPE 与 SVC 的 enc/dec 模型组合，音色模型主要兼容 **so-vits-svc 4.0** 生态，可从社区获取后导入使用。
