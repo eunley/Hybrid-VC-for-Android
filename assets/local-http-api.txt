@@ -1,0 +1,213 @@
+Local HTTP API v1
+=================
+Base URL: http://127.0.0.1:PORT/api/v1 (use the port shown by Service).
+All responses are JSON except successful result downloads (audio/wav).
+Legacy endpoints use string multipart/form-data fields (-F), including PUT/DELETE.
+The resumable /uploads endpoints below use JSON and raw chunk bodies instead.
+Names in paths must be URL-encoded once. Name whitelist: 1..100 Unicode
+letters/digits, underscore, space, dot, hyphen; cannot start with dot.
+No slash, backslash, traversal, or symbolic link roles.
+
+Examples (set a real port, role name and task ID):
+  B=http://127.0.0.1:16180/api/v1
+  curl "$B/roles"
+  curl -X POST -F name=alice -F file=@role.zip "$B/roles/import"
+  curl -X DELETE "$B/roles/alice"
+  curl -X POST -F frames=256 "$B/roles/alice/compilations"
+  curl -X DELETE -F frames=256 "$B/roles/alice/compilations"
+  curl "$B/logs"
+  curl -X DELETE "$B/logs"
+  curl -X PUT -F npu=true -F threads=6 "$B/config"
+  curl -X POST -F file=@input.wav -F role=alice -F frames=256 \
+    -F bufferFrames=16 -F denoise=false -F volumeLimit=false -F pitchSemitones=0 "$B/tasks"
+  ID=replace-with-returned-id
+  curl "$B/tasks/$ID"
+  curl -o result.wav "$B/tasks/$ID/result"
+  curl -X POST "$B/tasks/$ID/cancel"
+
+GET /roles -> 200 {"roles":[{"name":"alice","compiled":[128,256]}]}.
+compiled is Engine.listCompiled's sorted NPU frame sizes.
+POST /roles/import -> synchronous 201 {"name":"alice"}.
+Requires name + file ZIP. Existing role: 409. Extracts to private temporary
+storage with streaming reads, then passes the extracted model directory to
+RoleImporter.importRole(directory, stagingOutput, baseDir/tpl, log).
+Publishes staging output only on success. Always attempts temporary cleanup.
+Templates must already exist in baseDir/tpl. Import can take time; it is not
+an asynchronous task. The upload deadline ends before execution; a disconnected
+client does not interrupt import, and should query roles before retrying.
+ZIP: <=4096 entries, <=8 GiB extracted total, <=4 GiB per entry,
+per-entry expansion ratio <=200, nesting <=64. Rejects absolute paths,
+backslashes, drive prefixes, canonical escapes and duplicate destinations.
+ZIP links are materialized only as ordinary bytes, never created as links.
+DELETE /roles/{name} -> synchronous 200 {"deleted":true}.
+Deletion does not follow symbolic links. Role operations never select or
+change the role saved in Prefs.
+
+POST /roles/{name}/compilations -> asynchronous 202 task object.
+frames integer default 256, range 1..2584. A static decoder T mismatch gives
+400 before submission. Uses Engine.compileNpuContext; cannot be cancelled.
+DELETE same route -> synchronous 200, removes dec_ctx_FRAMES.onnx and its
+same-prefix sidecar files. frames has the same range/default. Missing compiled
+files are an idempotent success. Engine cache is released before changes.
+
+GET /logs -> 200 {"log":"..."}, last <=65536 bytes of app.log with partial
+first line omitted. DELETE -> 200 {"cleared":true}. Only application app.log;
+never clears helper logs or invokes su.
+PUT /config -> synchronous 200 {"npu":true,"threads":6}.
+npu is strictly true/false; threads integer 1..8. Missing fields retain current
+Prefs values. Releases Engine before updating Prefs and Engine.device, then reloads the current
+UI role when selected, following the existing configuration activation path.
+
+POST /tasks -> asynchronous 202 task object.
+Required: multipart file and role (whitelisted existing role name).
+Optional: frames=256 (1..2584), bufferFrames=min(16,frames/2)
+(0..floor(frames/2)), denoise=false (strict true/false),
+volumeLimit=false (strict true/false), pitchSemitones=0 (-24..24).
+denoise converts the cleaned signal and mixes back the original-minus-clean
+residual to preserve background sound. There is no silence gate.
+volumeLimit is independent of denoise: approximately 20 ms output RMS must not
+exceed the corresponding original input RMS; absolute output peak is <=1.
+No final whole-file peak normalization is applied when either option is enabled.
+With both disabled, legacy peak normalization to 0.95 is retained.
+bufferFrames means crossfade overlap frames, not a queue size or milliseconds.
+pitchSemitones is an integer semitone offset; there is no auto mode.
+Wire limits the entire request body to 128 MiB including multipart overhead.
+Copies the file out of Wire temporary storage before returning. MediaExtractor
+must report an audio track with a positive known duration <=120 seconds before
+decode; decoded mono 16k samples are checked again (1..1920000 samples).
+Unsupported or unknown-duration audio is rejected. Result: mono
+44.1 kHz WAV. Role and conversion parameters/backend/thread count are captured
+at submission; no conversion parameter is written to Prefs. Existing Engine
+cache is released both before and after worker execution.
+
+GET /tasks/{id} -> 200 task object. State: queued, running, succeeded,
+failed, cancelled. Fields: id, kind (convert/compile), state, role, frames,
+bufferFrames, pitchSemitones, denoise, volumeLimit, npu, threads, done, total,
+cancelRequested, error. done/total count completed conversion chunks.
+GET /tasks/{id}/result -> audio/wav only for succeeded conversion; otherwise
+409. Compilation tasks have no downloadable result.
+POST /tasks/{id}/cancel -> 200 current task object; cancellation is cooperative,
+so poll until cancelled. Only this API's active conversion can set the shared
+cancel flag while its Busy token is owned. Finished conversions are unchanged;
+compilation cancellation gives 409. Never calls JobService.requestCancel.
+At most 16 tasks including active task; oldest records and their files are
+removed on next submission. Input copies are removed when execution ends;
+failed/cancelled output is removed; successful output lives until eviction or
+API close. Downloads racing eviction/close may terminate and should be retried
+only while that task remains available.
+
+Concurrency/errors/lifecycle
+Engine mutations acquire global Busy atomically, except cancel of the currently
+owned HTTP conversion, which uses that conversion's token. Resumable upload
+creation, chunk transfer, status and cancellation do not acquire global Busy;
+completion acquires Busy for role import (see below). Conversion and
+compilation hold Busy until execution AND Engine cleanup finish. A busy engine
+returns 409; read-only endpoints remain available. No waiting mutation queue.
+Errors: {"error":{"code":400,"message":"message"}}; 400 invalid parameters/archive/audio/static T,
+404 route/role/task missing, 409 busy/conflict/result unavailable, 500 unexpected
+I/O or engine failure. Closing/closed returns 409. Asynchronous execution failures
+are state=failed with error text in GET /tasks/{id}, not an HTTP error response.
+Wire rejects oversized uploads as 400. Unknown methods/routes return 404.
+
+Service owner: construct LocalHttpApi(Context), pass it to LocalHttpWire.
+busy() reports this API's owned mutation, not another service's global Busy.
+On shutdown stop/close listener first, then call API.close() off main thread.
+Keep foreground notification/service alive until close returns. close stops new
+API work, cooperatively cancels HTTP conversion, waits for non-interruptible
+compilation and synchronous mutations, then deletes task storage. Do not stop
+foreground early. Does not alter another JobService's cancellation state.
+
+Defaults: service OFF, port 16180, loopback-only ON. Apply settings restarts
+listener. Disable loopback binds 0.0.0.0: LAN access (authentication depends on the configured token).
+No public tunnel. Android may stop even foreground services under system policy.
+
+Resumable role ZIP uploads (JSON/raw, Python standard-library client)
+------------------------------------------------------------------
+POST /uploads with Content-Type: application/json:
+  {"filename":"role.zip","total_size":12345678,"sha256":"optional 64 hex digits"}
+Returns an upload id. No global Busy lock is held while receiving chunks.
+Cache limits: <=4 GiB per uploaded ZIP file; <=8 GiB reserved across upload
+sessions, based on declared total_size, not just chunks already received.
+Persistent sessions support reconnect/resume for 24 hours; after expiration,
+create a new session. A missing/expired session is not silently recreated by
+the client. ZIP extraction limits also apply to legacy /roles/import:
+4 GiB per entry, 8 GiB extracted total, ratio <=200, <=4096 entries.
+
+PUT /uploads/{id}/chunks/{index}, Content-Type: application/octet-stream:
+raw bytes, zero-based index, exactly 8 MiB except the final chunk. Repeating a
+chunk PUT supports retries. GET /uploads/{id} returns status and missing chunk
+indices as an array; clients must accept either missing or missing_chunks.
+POST /uploads/{id}/complete with application/json {"name":"alice"} verifies
+size/hash and imports the ZIP. Completion acquires global Busy; a busy 409 is
+retryable after a delay. Other 409 conflicts require inspecting the error.
+202 means asynchronous import: poll GET /uploads/{id} until success or failure.
+Do not repeat an accepted completion while it is queued/running/importing.
+DELETE /uploads/{id} explicitly cancels/discards the upload. The Python client
+only sends DELETE with --cancel; Ctrl-C/network failures preserve the session.
+
+Complete curl example (requires python3 for JSON parsing and chunk slicing):
+  B=http://127.0.0.1:16180/api/v1
+  ZIP=role.zip
+  SIZE=$(python3 -c 'import os,sys; print(os.path.getsize(sys.argv[1]))' "$ZIP")
+  SHA=$(python3 -c 'import hashlib,sys; print(hashlib.file_digest(open(sys.argv[1],"rb"),"sha256").hexdigest())' "$ZIP")
+  python3 -c 'import json,sys; print(json.dumps(dict(filename=sys.argv[1],total_size=int(sys.argv[2]),sha256=sys.argv[3])))' "$ZIP" "$SIZE" "$SHA" > create.json
+  curl --fail-with-body -X POST -H 'Content-Type: application/json' --data-binary @create.json "$B/uploads" > session.json
+  ID=$(python3 -c 'import json; d=json.load(open("session.json")); print(d.get("id",d.get("upload_id")))')
+  curl --fail-with-body "$B/uploads/$ID" > status.json
+  # On resume, reuse ID and refresh status.json; never create a new session.
+  UPLOAD_OK=1
+  for I in $(python3 -c 'import json; d=json.load(open("status.json")); print(*d.get("missing",d.get("missing_chunks",[])))'); do
+    python3 -c 'import sys; f=open(sys.argv[1],"rb"); f.seek(int(sys.argv[2])*8388608); sys.stdout.buffer.write(f.read(8388608))' "$ZIP" "$I" > chunk.bin
+    curl --fail-with-body -X PUT -H 'Content-Type: application/octet-stream' --data-binary @chunk.bin "$B/uploads/$ID/chunks/$I" || { UPLOAD_OK=0; break; }
+  done
+  # Only complete after every PUT succeeded. On busy 409, wait and retry this POST.
+  test "$UPLOAD_OK" = 1 && curl --fail-with-body -i -X POST -H 'Content-Type: application/json' --data '{"name":"alice"}' "$B/uploads/$ID/complete"
+  # After 202, repeat GET until terminal success/failure:
+  curl --fail-with-body "$B/uploads/$ID"
+  # Explicit cancellation only (do not run after successful import):
+  # curl --fail-with-body -X DELETE "$B/uploads/$ID"
+
+Python usage (Python 3.11+, no third-party packages):
+  python3 assets/upload_role.py --url http://127.0.0.1:16180 --name alice --zip role.zip
+  python3 assets/upload_role.py --url http://127.0.0.1:16180/api/v1 --name alice --zip role.zip --sha256
+  # Re-run the SAME command after disconnection/Ctrl-C to resume.
+  # Default sidecar is role.zip.session.json next to the ZIP; atomically saved.
+  # Keep ZIP/name/URL unchanged. --session PATH selects a different sidecar.
+  python3 assets/upload_role.py --url http://127.0.0.1:16180 --zip role.zip --cancel
+  # Optional: --retries 10 --retry-delay 2 --timeout 60
+The client uploads only missing chunks, retries transient requests and Busy
+completion, polls accepted completion, and removes the sidecar on success.
+A request whose response is lost may have reached the server; chunk PUT and
+completion retry therefore depend on server idempotency. If creation succeeds
+but its response is lost, an untracked session may remain until 24h expiry.
+
+Disk budget: creation checks 2 * ZIP size + 12 GiB import/extraction budget
++ other reserved uploads + 64 MiB free headroom. Completion checks ZIP size
++ 12 GiB + 64 MiB. The conservative 12 GiB covers up to 8 GiB extracted
+files and 4 GiB import staging. Actual uncompressed sizes and free disk are
+also checked while extracting; insufficient space returns 507. Import output
+is checked against a 4 GiB staging budget before publication. Tensor conversion
+uses bounded arrays rather than holding raw ZIP entries; model conversion still
+requires sufficient Android heap for templates and output tensor weights.
+
+Bearer authentication
+---------------------
+An empty key disables authentication: Authorization is not checked. The old
+four-argument LocalHttpWire constructor also disables authentication. With a
+nonempty key every route, including uploads, downloads and unknown routes,
+requires Authorization: Bearer <token>. Bearer is case-insensitive; the token
+is case-sensitive. Validation happens after headers and before body processing
+or handler invocation. Missing/wrong credentials return generic 401 Unauthorized.
+Duplicate headers (including Authorization with different casing) return 400.
+Custom tokens must be 1..256 visible ASCII characters (0x21..0x7e), without
+spaces; empty is legal and switches auth off. validateToken(null) is false.
+HTTP is plaintext: tokens, uploaded files and downloaded audio are not encrypted.
+Use a trusted network or a separately secured transport.
+For authenticated curl examples above add -H "Authorization: Bearer $HTTP_TOKEN"
+to EVERY request, including chunk PUT, completion, polling, cancel and download.
+Python reads HTTP_TOKEN by default; --token overrides it (even --token '' to
+disable the header). The token is not saved in session sidecars. Prefer the
+environment to placing a secret in command-line arguments:
+  export HTTP_TOKEN='your-key'
+  python3 assets/upload_role.py --url http://127.0.0.1:16180 --name alice --zip role.zip
+  python3 assets/upload_role.py --url http://127.0.0.1:16180 --zip role.zip --cancel

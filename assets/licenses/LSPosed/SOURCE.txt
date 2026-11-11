@@ -1,0 +1,1 @@
+LSPosed/LSPosed df74d83eb03a44cc6ad268841ac2ada28d077c77 GPL-3.0-or-later. Vectors retain headers; removed theme tint. https://github.com/LSPosed/LSPosed

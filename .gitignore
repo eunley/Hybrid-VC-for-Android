@@ -1,0 +1,44 @@
+# Build outputs and local dependencies
+.build/
+.private/
+libs/
+out/
+hout/
+hdex/
+*.apk
+*.aab
+*.dex
+*.class
+*.so
+*.aar
+*.jar
+*.idsig
+*.log
+__pycache__/
+*.pyc
+tests/*-classes/
+tests/classes/
+tests/stubs/
+# Secrets and local configuration
+*.jks
+*.keystore
+*.pem
+*.key
+.env
+.env.*
+local.properties
+# Models and training artifacts
+assets/models/
+*.onnx
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.npz
+*.npy
+# Private voice packages and large archives
+*.wav
+*.flac
+*.mp3
+*.zip
+*.tar.gz

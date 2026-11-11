@@ -1,0 +1,9 @@
+Copyright 2025 Kyant
+Apache License 2.0; full license: AndroidLiquidGlass-LICENSE.txt
+Source: https://github.com/Kyant0/AndroidLiquidGlass
+Commit: 65ab177e90e5c1d8c62e70cf7755841982da65f6
+Adapted files:
+backdrop/src/commonMain/kotlin/com/kyant/backdrop/internal/Shaders.kt
+app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidBottomTabs.kt
+app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/DampedDragAnimation.kt
+Modified 2026 for Java View: combined backdrop/row bitmap, nav-coordinate lens, grayscale no dispersion, native spring integrator, lifecycle and reduced-motion handling.
