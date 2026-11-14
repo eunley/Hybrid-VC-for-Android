@@ -54,16 +54,13 @@ public final class WaveAuxWindow {
         public void run() {
             if (!attached) return;
             refreshTitle();
+            // 唯一权威：显示中 且 实时在跑，才排帧。窗口保留（可拖动看最后一段），
+            // 停止后不再刷帧也不再重绘。
             boolean live = RealtimeService.running;
-            if (showing && live && !handler.hasCallbacks(frame)) {
-                // 实时变声重新开始：恢复绘制
-                store.setPublishing(true);
-                handler.post(frame);
-            } else if (showing && !live) {
-                // 采集已停：保留窗口让最后一段波形可读，只停刷新（不再画新帧）
-                store.setPublishing(false);
-                handler.removeCallbacks(frame);
-            }
+            boolean want = showing && live;
+            store.setPublishing(want);
+            if (want && !handler.hasCallbacks(frame)) handler.post(frame);
+            else if (!want) handler.removeCallbacks(frame);
             handler.postDelayed(this, POLL_MS);
         }
     };
@@ -182,7 +179,8 @@ public final class WaveAuxWindow {
         }
         attached = true;
         showing = true;
-        store.setPublishing(true);
+        lastRevision = Long.MIN_VALUE;      // 首帧必定重绘一次，避免窗口空白
+        store.setPublishing(RealtimeService.running);
         startTimers();
         return true;
     }
@@ -220,6 +218,12 @@ public final class WaveAuxWindow {
         handler.post(poll);
     }
 
+    /** Force one repaint now (e.g. right after the switch is turned on). */
+    public void invalidateNow() {
+        lastRevision = Long.MIN_VALUE;
+        if (attached) view.invalidate();
+    }
+
     private void stopTimers() {
         handler.removeCallbacks(frame);
         handler.removeCallbacks(poll);
@@ -227,16 +231,12 @@ public final class WaveAuxWindow {
     }
 
     /**
-     * Called by the service when the activity/audio flips: re-attaches the frame timer only while
-     * the window is still displayed.
+     * Hint only: the 100 ms poll decides whether the frame timer should actually run, so the menu
+     * tick and the poll can never fight over the flag.
      */
     public void setPublishing(boolean on) {
         if (!attached) return;
-        if (store.publishing() == on && handler.hasCallbacks(frame)) return;
-        store.setPublishing(on);
-        if (on && !handler.hasCallbacks(frame)) {
-            handler.post(frame);
-            if (!handler.hasCallbacks(poll)) handler.post(poll);
-        }
+        if (on && store.publishing() && handler.hasCallbacks(frame)) store.setPublishing(true);
+        refreshTitle();
     }
 }
