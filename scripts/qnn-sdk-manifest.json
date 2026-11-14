@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "sdk_version": "2.51.0.260929",
+  "build_id": "v2.51.0.260929181845",
+  "source_url": "https://softwarecenter.qualcomm.com/api/download/software/sdks/Qualcomm_AI_Runtime_Community/All/2.51.0.260929/v2.51.0.260929.zip",
+  "archive_filename": "qairt-2.51.0.260929.zip",
+  "archive_size": 2971497940,
+  "archive_sha256": "9b4ca798902f02a2543857f5de4d233830c044d19701b92fc66a12fdc292211f",
+  "archive_validation": "All 12460 ZIP entries checked with zipfile.testzip(); individual library CRC32 checked during extraction. SHA-256 is locally computed, not a Qualcomm-published digest.",
+  "required_arches": [
+    69,
+    73,
+    75,
+    79,
+    81,
+    85
+  ],
+  "optional_arches": [
+    68
+  ],
+  "qnn_core_api": "2.40.0",
+  "libraries": [
+    {
+      "name": "libQnnGpu.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnGpu.so",
+      "size": 12367568,
+      "crc32": "007b85b1",
+      "sha256": "31ea3f595cc5fa822f71d9e1fb38d286db9230dfc5a316585cdb75d2eb10b547"
+    },
+    {
+      "name": "libQnnHtp.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtp.so",
+      "size": 4158224,
+      "crc32": "6382a955",
+      "sha256": "06bd420b3e8f19a6ab0e8181d1aac37d7fccd55b5958a102458b4125bbd7373f"
+    },
+    {
+      "name": "libQnnHtpPrepare.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpPrepare.so",
+      "size": 88106712,
+      "crc32": "d72bcc81",
+      "sha256": "3697f6df02ea78ac66be0cacf85d5e29edd60073415a0e65b7ae48a61d519518"
+    },
+    {
+      "name": "libQnnHtpV68Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV68Stub.so",
+      "size": 795168,
+      "crc32": "c1c55969",
+      "sha256": "42f836611337e4de12122724e4243b5dae7ad1227d89f68bf0ee350d5158d5c0"
+    },
+    {
+      "name": "libQnnHtpV69Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV69Stub.so",
+      "size": 795168,
+      "crc32": "f22b9adb",
+      "sha256": "81192853575e692455c7639b47060aee6414ab7ef9fdbb5f8ae86bbdb357d9da"
+    },
+    {
+      "name": "libQnnHtpV73Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV73Stub.so",
+      "size": 802632,
+      "crc32": "a2628e70",
+      "sha256": "0f0a5cb8410d3dd699ff3b0155b213d6012e354a437b39f43c37c80d17a4bde2"
+    },
+    {
+      "name": "libQnnHtpV75Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV75Stub.so",
+      "size": 802632,
+      "crc32": "6c124007",
+      "sha256": "b001da8f6aae9fa65066eda6ec4433616d59a2079428c6678e07315b4e4b4a33"
+    },
+    {
+      "name": "libQnnHtpV79Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV79Stub.so",
+      "size": 802632,
+      "crc32": "c35914bc",
+      "sha256": "bb7deaf56f7a507bffd2b125e1064cdcb8d82dfefeb03678f2f140c6992fa05f"
+    },
+    {
+      "name": "libQnnHtpV81Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV81Stub.so",
+      "size": 827056,
+      "crc32": "6b821e83",
+      "sha256": "d26d6ba50964d0fcaead5a518b34360feb728e09bb0742dfc54c65eeb56f20c8"
+    },
+    {
+      "name": "libQnnHtpV85Stub.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnHtpV85Stub.so",
+      "size": 875568,
+      "crc32": "f94e155e",
+      "sha256": "96d3a1a72233271d0a822aca81bb51e68a7dc2ec6ff69d7e3911a117ac29c40e"
+    },
+    {
+      "name": "libQnnSystem.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/aarch64-android/libQnnSystem.so",
+      "size": 4125232,
+      "crc32": "3aa6c925",
+      "sha256": "199371bf2d3e61188bdfd19fbc6c34273d53ba11794444d85ef60e482807ce54"
+    },
+    {
+      "name": "libQnnHtpV68Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v68/unsigned/libQnnHtpV68Skel.so",
+      "size": 12984164,
+      "crc32": "cd5fdf31",
+      "sha256": "3f71eb57ce13a23d9dd92c6732782203ebb50245d2411812b06000008a2e1c21"
+    },
+    {
+      "name": "libQnnHtpV69Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v69/unsigned/libQnnHtpV69Skel.so",
+      "size": 13027556,
+      "crc32": "73698713",
+      "sha256": "b2f2fff2e6950d7ce71849c7c99e8b9ba6c16efdb84e63fa1fbd0c1a8efe9e91"
+    },
+    {
+      "name": "libQnnHtpV73Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v73/unsigned/libQnnHtpV73Skel.so",
+      "size": 13018320,
+      "crc32": "3a8a327f",
+      "sha256": "4b53a5499d70459814079722dc4b57ba0bd23b915d50b89cdee99266a0624a28"
+    },
+    {
+      "name": "libQnnHtpV75Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v75/unsigned/libQnnHtpV75Skel.so",
+      "size": 12997844,
+      "crc32": "d538937b",
+      "sha256": "58ff15eafba5963adb8ace60f79c17be8ff8a75011b3c613419d1d9e07fcc188"
+    },
+    {
+      "name": "libQnnHtpV79Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so",
+      "size": 13215784,
+      "crc32": "1599ce9e",
+      "sha256": "a90f3493f6f5c38672eca8d1bf61d645e7c5b2838db3fc89e62638187110f3d1"
+    },
+    {
+      "name": "libQnnHtpV81Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v81/unsigned/libQnnHtpV81Skel.so",
+      "size": 14198532,
+      "crc32": "64816cba",
+      "sha256": "e1eeb53f7fe1699fbe842ea2bb495a310ae7ac638c33e1ae42077d48a1ff0764"
+    },
+    {
+      "name": "libQnnHtpV85Skel.so",
+      "archive_entry": "qairt/2.51.0.260929/lib/hexagon-v85/unsigned/libQnnHtpV85Skel.so",
+      "size": 14049836,
+      "crc32": "fcbc6500",
+      "sha256": "dcc6be053edf17763fbfa0200214212edf5bae96550d2c5c1667d551d0e2da6b"
+    }
+  ]
+}

@@ -22,7 +22,7 @@ import android.widget.TextView;
  */
 public final class WaveAuxWindow {
 
-    private static final int FRAME_MS = 33;          // ~30 fps
+    private static final int FRAME_MS = 16;          // ~60 fps while live
     private static final int POLL_MS = 100;
 
     private final Context ctx;
@@ -41,7 +41,7 @@ public final class WaveAuxWindow {
     private final Runnable frame = new Runnable() {
         public void run() {
             if (!attached) return;
-            if (store.publishing() && store.revision() != lastRevision) {
+            if (store.publishing()) {
                 lastRevision = store.revision();
                 view.invalidate();
             }
@@ -86,11 +86,12 @@ public final class WaveAuxWindow {
         FrameLayout.LayoutParams vl = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT);
-        vl.topMargin = px(13);
-        vl.bottomMargin = px(1);
+        vl.topMargin = px(1);
+        vl.bottomMargin = px(16);
 
         FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, px(14));
+        tl.gravity = Gravity.BOTTOM;
         root.addView(title, tl);
         root.addView(view, vl);
         refreshTitle();
@@ -105,49 +106,20 @@ public final class WaveAuxWindow {
         if (!s.contentEquals(title.getText())) title.setText(s);
     }
 
-    /** Drag anywhere on the strip; the whole window moves, so the traces never re-lay-out. */
     private void installDrag() {
-        root.setOnTouchListener(new View.OnTouchListener() {
-            float dx, dy;
-            int ox, oy;
-            boolean moving;
-            public boolean onTouch(View v, MotionEvent e) {
-                switch (e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        dx = e.getRawX(); dy = e.getRawY();
-                        ox = WaveAuxWindow.this.pos.x;
-                        oy = WaveAuxWindow.this.pos.y;
-                        moving = false;
-                        return true;
+        root.setOnTouchListener(new View.OnTouchListener(){
+            float downX,downY;int startX,startY;
+            public boolean onTouch(View v,MotionEvent e){
+                switch(e.getActionMasked()){
+                    case MotionEvent.ACTION_DOWN:downX=e.getRawX();downY=e.getRawY();startX=pos.x;startY=pos.y;return true;
                     case MotionEvent.ACTION_MOVE:
-                        if (Math.hypot(e.getRawX() - dx, e.getRawY() - dy) > px(4)) moving = true;
-                        if (moving) {
-                            WaveAuxWindow.this.pos.x = ox + (int) (e.getRawX() - dx);
-                            WaveAuxWindow.this.pos.y = oy + (int) (e.getRawY() - dy);
-                            clampPos();
-                            try { wm.updateViewLayout(root, WaveAuxWindow.this.pos); }
-                            catch (RuntimeException ignored) { }
-                        }
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        WaveAuxWindow.this.x = WaveAuxWindow.this.pos.x;
-                        WaveAuxWindow.this.y = WaveAuxWindow.this.pos.y;
-                        moving = false;
-                        return true;
-                }
-                return false;
+                        pos.x=Math.max(0,Math.min(startX+(int)(e.getRawX()-downX),Math.max(0,ctx.getResources().getDisplayMetrics().widthPixels-pos.width)));
+                        pos.y=Math.max(0,Math.min(startY+(int)(e.getRawY()-downY),Math.max(0,ctx.getResources().getDisplayMetrics().heightPixels-pos.height)));
+                        x=pos.x;y=pos.y;try{wm.updateViewLayout(root,pos);}catch(RuntimeException ignored){}return true;
+                    case MotionEvent.ACTION_UP:case MotionEvent.ACTION_CANCEL:return true;
+                }return false;
             }
         });
-    }
-
-    private void clampPos() {
-        int sw = ctx.getResources().getDisplayMetrics().widthPixels;
-        int sh = ctx.getResources().getDisplayMetrics().heightPixels;
-        int w = pos.width > 0 ? pos.width : px(240);
-        int h = pos.height > 0 ? pos.height : px(96);
-        pos.x = Math.max(-w / 6, Math.min(pos.x, sw - w / 2));
-        pos.y = Math.max(0, Math.min(pos.y, sh - h / 2));
     }
 
     /** Attach the strip. Safe to call repeatedly. */
@@ -163,14 +135,8 @@ public final class WaveAuxWindow {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         pos.gravity = Gravity.TOP | Gravity.LEFT;
-        int sw = ctx.getResources().getDisplayMetrics().widthPixels;
-        int sh = ctx.getResources().getDisplayMetrics().heightPixels;
-        if (x == Integer.MIN_VALUE) {
-            x = sw - px(246);
-            y = sh / 3;
-        }
-        pos.x = x;
-        pos.y = y;
+        pos.x = x == Integer.MIN_VALUE ? px(8) : x;
+        pos.y = x == Integer.MIN_VALUE ? ctx.getResources().getDisplayMetrics().heightPixels / 3 : y;
         installDrag();
         try {
             wm.addView(root, pos);

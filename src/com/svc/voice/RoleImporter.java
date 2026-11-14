@@ -63,6 +63,7 @@ public final class RoleImporter {
      * @param tplDir   模板目录（enc.onnx + enc.onnx.data + dec.onnx + dec.onnx.data）
      */
     public static Result importRole(File src, File outDir, File tplDir, Log log) throws IOException {
+        BundledTemplates.ensureReady(tplDir);
         long t0 = System.currentTimeMillis();
         Result r = new Result();
 

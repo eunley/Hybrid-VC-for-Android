@@ -4,7 +4,7 @@ import java.io.File;
 public final class BundledModels {
  private static Context app;
  public static volatile String state="idle";
- public static void init(Context c){app=c.getApplicationContext();}
+ public static void init(Context c){app=c.getApplicationContext();BundledTemplates.init(name->app.getAssets().open("tpl/"+name));}
  public static void request(Context c){init(c);new Thread(()->{
   if(!Busy.acquire("model-install"))return;
   try{ensureReady(new File(new Prefs(c).modelsDir()),s->android.util.Log.i("SVCModels",s));}

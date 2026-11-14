@@ -8,7 +8,8 @@ package com.svc.voice;
  *   <li>input: 16 kHz samples captured for conversion ({@link #inputWritten});</li>
  *   <li>output: 44.1 kHz samples committed by the conversion sink
  *       ({@code sink.audio(audio, start44)}), reported through {@link #outputCommitted};</li>
- *   <li>played: real consumption from {@code AudioTrack.getPlaybackHeadPosition()} (unsigned);</li>
+ *   <li>played: real consumption from {@code AudioTrack.getPlaybackHeadPosition()} (unsigned),
+ *       including authenticated per-track helper reports at 48 kHz;</li>
  *   <li>injected: bytes handed to the virtual-mic sink only. This is a write cursor, never a
  *       claim that a receiving app read the audio.</li>
  * </ul>
@@ -37,6 +38,9 @@ public final class WaveProbe {
     private static volatile long played44;
     private static volatile long injected48;
     private static volatile boolean playbackReal;
+    private static volatile boolean virtualMic;
+    private static volatile long systemPlayed48 = -1;
+    private static volatile long systemReportNs;
 
     public static void reset() {
         inputEnd16 = 0;
@@ -44,6 +48,9 @@ public final class WaveProbe {
         played44 = 0;
         injected48 = 0;
         playbackReal = false;
+        virtualMic = false;
+        systemPlayed48 = -1;
+        systemReportNs = 0;
         WaveStore s = store;
         if (s != null) s.clear();
     }
@@ -58,7 +65,7 @@ public final class WaveProbe {
         WaveStore s = store;
         // 开关关闭时 store 为 null：只推进坐标，不分配也不存图形。
         // 窗口存在但暂时不刷新（publishing=false）时仍然写入，保证重新显示时时间轴没有洞。
-        if (s != null) s.pushInput(x, 0, n);
+        if (s != null) { long gap=inputEnd16-s.inputEnd16(); if(gap>0) s.alignInput(inputEnd16); s.pushInput(x, 0, n); }
         inputEnd16 += n;
     }
 
@@ -76,7 +83,7 @@ public final class WaveProbe {
 
     /**
      * Real playback head, already unsigned. Pass -1 when the track is not playing.
-     * Counters restart at 0 for every AudioTrack, so the screen reader keeps its own base.
+     * This path stays dedicated to ordinary local AudioTrack playback at 44.1 kHz.
      */
     static void played(long head44) {
         if (head44 >= 0) {
@@ -85,6 +92,25 @@ public final class WaveProbe {
         } else {
             playbackReal = false;
         }
+    }
+
+    /** Set after reset: injection playback comes only from the authenticated helper channel. */
+    static void virtualMic(boolean on) { virtualMic = on; }
+
+    /** Cumulative 48k head of the furthest valid, consuming helper AudioTrack; -1 = unknown. */
+    static void vmicPlayed(long head48) {
+        systemPlayed48 = head48;
+        systemReportNs = System.nanoTime();
+    }
+
+    private static boolean systemPlaybackReal() {
+        return systemPlayed48 >= 0 && VmicProgressWire.isFresh(systemReportNs, System.nanoTime());
+    }
+
+    /** Real playback on the shared 16k axis, or -1. Never derived from injected bytes. */
+    static long playbackPosition16() {
+        if (virtualMic) return systemPlaybackReal() ? VmicProgressWire.toInput16(systemPlayed48) : -1;
+        return playbackReal ? WaveStore.toInput16(played44) : -1;
     }
 
     /** Bytes accepted by the virtual-mic writer. Write cursor only. */
@@ -97,12 +123,11 @@ public final class WaveProbe {
         StringBuilder b = new StringBuilder();
         b.append("in ").append(fmtMs(inputEnd16, WaveStore.RATE_IN));
         b.append(" · out ").append(fmtMs(outputEnd44, WaveStore.RATE_OUT));
-        if (playbackReal) b.append(" · play ").append(fmtMs(played44, WaveStore.RATE_OUT));
-        else if (injected48 > 0) {
-            // Explicitly a write cursor: the helper does not report what the receiving app drained.
-            b.append(" · vmic write ")
-             .append(String.format(java.util.Locale.ROOT, "%.2fs", injected48 / 48000.0));
-        }
+        if (virtualMic && systemPlaybackReal()) {
+            b.append(" · system AudioTrack play ").append(fmtMs(systemPlayed48, 48000));
+        } else if (!virtualMic && playbackReal) {
+            b.append(" · play ").append(fmtMs(played44, WaveStore.RATE_OUT));
+        } else b.append(" · play ?");
         double rtf = LiveWindowState.snapshot()[7];
         b.append(" · RTF ").append(Double.isNaN(rtf) ? "--" : String.format(java.util.Locale.ROOT, "%.2f", rtf));
         return b.toString();
@@ -115,6 +140,7 @@ public final class WaveProbe {
 
     /** Cursor values for tests / diagnostics. */
     public static long[] counters() {
-        return new long[] {inputEnd16, outputEnd44, played44, injected48, playbackReal ? 1 : 0};
+        return new long[] {inputEnd16, outputEnd44, played44, injected48, playbackReal ? 1 : 0,
+                systemPlayed48, systemPlaybackReal() ? 1 : 0};
     }
 }

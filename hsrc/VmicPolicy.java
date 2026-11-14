@@ -178,11 +178,27 @@ public class VmicPolicy {
      *   停采集 -> pause+release 所有注入 track -> unregisterAudioPolicy
      * 不清理的话 policy 会一直劫持系统录音，录音机录到的全是静音。
      */
+    static void closeRealtimeSocket(android.net.LocalSocket socket) {
+        if (socket == null) return;
+        try { socket.shutdownInput(); } catch (Throwable ignore) { }
+        try { socket.shutdownOutput(); } catch (Throwable ignore) { }
+        try { socket.close(); } catch (Throwable ignore) { }
+    }
+
     static synchronized void cleanup() {
         STOP = true;
+        android.net.LocalSocket progress = RT_PROGRESS_SOCKET; RT_PROGRESS_SOCKET = null;
+        closeRealtimeSocket(progress);
+        Thread progressThread = RT_PROGRESS_THREAD; RT_PROGRESS_THREAD = null;
+        if (progressThread != null) progressThread.interrupt();
+        android.net.LocalSocket capture = RT_SOCKET; RT_SOCKET = null;
+        closeRealtimeSocket(capture);
         if (CAP_PROC != null) {
-            try { CAP_PROC.getOutputStream().close(); CAP_PROC.destroy(); } catch (Throwable ignore) { }
-            CAP_PROC = null;
+            Process child = CAP_PROC; CAP_PROC = null;
+            try { child.getOutputStream().close(); child.destroy(); } catch (Throwable ignore) { }
+            try { child.getInputStream().close(); } catch (Throwable ignore) { }
+            try { child.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
         for (Object t : TRACKS) {
             try { call(t, "pause", new Class<?>[0]); } catch (Throwable ignore) { }
@@ -191,6 +207,7 @@ public class VmicPolicy {
         TRACKS.clear();
         W_TRACKS.clear();
         W_METHODS.clear();
+        W_PROGRESS = new TrackProgress[0];
         if (POLICY != null && MANAGER != null) {
             try {
                 Class<?> amCls = cls("android.media.AudioManager");
@@ -266,6 +283,124 @@ public class VmicPolicy {
     static final List<Object> W_TRACKS = new ArrayList<Object>();
     static final List<Method> W_METHODS = new ArrayList<Method>();
 
+    // A separate authenticated socket has exactly one writer. Keep this wire layout in sync
+    // with com.svc.voice.VmicProgressWire; the helper build deliberately stays single-source.
+    static final class ProgressWire {
+        static final int MAGIC = 0x53565031, VERSION = 1, RATE = 48000, MAX_TRACKS = 8;
+        static void hello(java.io.DataOutput out, int tracks) throws java.io.IOException {
+            if (tracks < 1 || tracks > MAX_TRACKS) throw new java.io.IOException("progress tracks");
+            out.writeInt(MAGIC); out.writeInt(VERSION); out.writeInt(RATE); out.writeInt(tracks);
+        }
+        static void frame(java.io.DataOutput out, long seq, long[] written, long[] played,
+                          int[] flags) throws java.io.IOException {
+            int count = written.length;
+            out.writeInt(1); out.writeInt(12 + 20 * count);
+            out.writeLong(seq); out.writeInt(count);
+            for (int i = 0; i < count; i++) {
+                out.writeLong(written[i]); out.writeLong(played[i]); out.writeInt(flags[i]);
+            }
+        }
+    }
+
+    /** Pure counter: extend uint32 wraps, reject resets, never substitute writes for head motion. */
+    static final class PlaybackCounter {
+        long raw, total, played;
+        boolean invalid;
+        long sample(int value, long writtenFrames) {
+            if (invalid) return played;
+            long now = value & 0xffffffffL;
+            long delta = (now - raw) & 0xffffffffL;
+            if (delta > 0x7fffffffL || writtenFrames < played || Long.MAX_VALUE-total < delta) {
+                invalid = true; return played;
+            }
+            raw = now; total += delta;
+            // A temporarily head-ahead-of-write snapshot must not turn a later write into play.
+            if (delta > 0) played = Math.max(played, Math.min(total, writtenFrames));
+            return played;
+        }
+    }
+
+    static final class TrackProgress {
+        final Object track;
+        final Method head;
+        final PlaybackCounter counter = new PlaybackCounter();
+        volatile long acceptedBytes;
+        TrackProgress(Object track) {
+            this.track = track;
+            head = findMethod(track.getClass(), "getPlaybackHeadPosition", new Class<?>[0]);
+        }
+    }
+    static volatile TrackProgress[] W_PROGRESS = new TrackProgress[0];
+    static volatile android.net.LocalSocket RT_SOCKET, RT_PROGRESS_SOCKET;
+    static volatile Thread RT_PROGRESS_THREAD;
+
+    static void startProgress(final String name, final int appUid, final int appPid) {
+        if (name == null) return; // Old callers have no progress channel; App displays unknown.
+        final TrackProgress[] states = W_PROGRESS;
+        Thread thread = new Thread(() -> {
+            android.net.LocalSocket socket = new android.net.LocalSocket();
+            RT_PROGRESS_SOCKET = socket;
+            try {
+                if (STOP) return;
+                socket.connect(new android.net.LocalSocketAddress(name));
+                android.net.Credentials peer = socket.getPeerCredentials();
+                if (peer.getUid() != appUid || peer.getPid() != appPid)
+                    throw new SecurityException("wrong progress app peer");
+                socket.setSoTimeout(1500);
+                java.io.DataOutputStream out = new java.io.DataOutputStream(socket.getOutputStream());
+                ProgressWire.hello(out, states.length);
+                long[] written = new long[states.length], played = new long[states.length];
+                int[] flags = new int[states.length];
+                long seq = 0;
+                while (!STOP && !Thread.currentThread().isInterrupted()) {
+                    for (int i = 0; i < states.length; i++) {
+                        TrackProgress state = states[i];
+                        flags[i] = 0;
+                        try {
+                            if (state.head == null) throw new NoSuchMethodException("playback head");
+                            int raw = ((Number)state.head.invoke(state.track)).intValue();
+                            // Read acceptedBytes AFTER head, bounding partial/blocking writes.
+                            state.counter.sample(raw, state.acceptedBytes / 2);
+                            if (!state.counter.invalid && state.counter.played > 0) flags[i] = 1;
+                        } catch (Throwable unavailable) { /* this track is unknown, not estimated */ }
+                        written[i] = state.acceptedBytes / 2;
+                        played[i] = state.counter.played;
+                    }
+                    ProgressWire.frame(out, ++seq, written, played, flags); out.flush();
+                    Thread.sleep(50);
+                }
+            } catch (InterruptedException stopped) { Thread.currentThread().interrupt(); }
+            catch (Throwable failure) { if (!STOP) System.err.println("[rt] progress unavailable: " + failure); }
+            finally {
+                closeRealtimeSocket(socket);
+                if (RT_PROGRESS_SOCKET == socket) RT_PROGRESS_SOCKET = null;
+            }
+        }, "track-progress");
+        thread.setDaemon(true); RT_PROGRESS_THREAD = thread; thread.start();
+    }
+
+    /** PCM is a byte stream: retain an odd byte across arbitrary socket read boundaries. */
+    static final class PcmReader {
+        final java.io.InputStream in;
+        final byte[] bytes = new byte[3840];
+        int pending;
+        PcmReader(java.io.InputStream in) { this.in = in; }
+        int read() throws java.io.IOException {
+            for (;;) {
+                int n = in.read(bytes, pending, bytes.length - pending);
+                if (n < 0) {
+                    if (pending != 0) throw new java.io.EOFException("truncated model PCM16");
+                    return -1;
+                }
+                int total = pending + n;
+                int aligned = total & ~1;
+                pending = total - aligned;
+                if (aligned > 0) return aligned;
+            }
+        }
+        void consumed(int n) { if (pending != 0) bytes[0] = bytes[n]; }
+    }
+
     /** 取所有 track 的 4 参数 write(byte[],int,int,int)，MicBoost 同样遍历全部写 */
     static void prepareWriter() {
         W_TRACKS.clear();
@@ -284,6 +419,9 @@ public class VmicPolicy {
             }
             if (wm != null) { W_TRACKS.add(t); W_METHODS.add(wm); }
         }
+        TrackProgress[] states = new TrackProgress[W_TRACKS.size()];
+        for (int i = 0; i < states.length; i++) states[i] = new TrackProgress(W_TRACKS.get(i));
+        W_PROGRESS = states;
         System.out.println("[vmic] writer tracks=" + W_TRACKS.size());
     }
 
@@ -293,6 +431,7 @@ public class VmicPolicy {
      * AudioFlinger 就一直重放它的旧缓冲 —— 这也是"重复"的来源之一。
      */
     static void writeAllTracks(byte[] b, int off, int len) {
+        final TrackProgress[] progress = W_PROGRESS;
         for (int k = 0; k < W_TRACKS.size(); k++) {
             Object t = W_TRACKS.get(k);
             Method wm = W_METHODS.get(k);
@@ -305,7 +444,9 @@ public class VmicPolicy {
                     // 返回 0 = track 暂时满，等 1ms 重试同一位置。
                     // 绝不能 break —— 那会丢掉这块剩下的音频，直接变成断音、杂音。
                     if (n == 0) { WRITE_ZERO++; try { Thread.sleep(1); } catch (InterruptedException e) { return; } continue; }
+                    if (n > len - done) throw new IllegalStateException("oversized track write=" + n);
                     if (n < len - done) WRITE_PARTIAL++;
+                    if (k < progress.length) progress[k].acceptedBytes += n;
                     done += n;
                 } catch (Throwable e) {
                     WRITE_ERR++;
@@ -687,11 +828,12 @@ public class VmicPolicy {
     }
 
     static boolean RT_CAPTURE=false;
-    static void realtime(String socket, long uid, int appUid, int appPid) throws Exception {
+    static void realtime(String socket, long uid, int appUid, int appPid, String progressName) throws Exception {
         APP_PID=appPid; STOP=false; RT_CAPTURE=true;
         installCleanupHook();
         protectFromKill();
         android.net.LocalSocket ipc=new android.net.LocalSocket();
+        RT_SOCKET=ipc;
         try {
             ipc.connect(new android.net.LocalSocketAddress(socket));
             android.net.Credentials peer=ipc.getPeerCredentials();
@@ -731,22 +873,23 @@ public class VmicPolicy {
                 if(!CAP_PROC.isAlive()||q.peek()!=null&&q.peek().length==0)throw new java.io.IOException("cap exited during policy setup");
                 out.writeInt(1);out.writeUTF("STARTED");out.flush();
                 System.err.println("[rt] stage=STARTED");
+                startProgress(progressName, appUid, appPid);
                 for(byte[] block:prime){out.write(block);out.flush();}
             } catch(Throwable failure) {
                 try{out.writeInt(-1);out.writeUTF(failure.toString());out.flush();}catch(Throwable ignored){}
                 throw failure;
             }
             Thread writer=new Thread(() -> {
-                try {java.io.InputStream in=ipc.getInputStream();byte[] b=new byte[3840];int n;
-                    while(!STOP&&(n=in.read(b))>0)writeAllTracks(b,0,n);
+                try {PcmReader in=new PcmReader(ipc.getInputStream());int n;
+                    while(!STOP&&(n=in.read())>0){writeAllTracks(in.bytes,0,n);in.consumed(n);}
                 } catch(Throwable t){System.err.println(t);}
-                finally {STOP=true;try{ipc.close();}catch(Throwable ignored){} cleanup();}
+                finally {STOP=true;closeRealtimeSocket(ipc);cleanup();}
             },"model-inject");writer.setDaemon(true);writer.start();
             while(!STOP){byte[] b=q.poll(3,java.util.concurrent.TimeUnit.SECONDS);
                 if(b==null||b.length==0)throw new java.io.EOFException("capture timeout/EOF");
                 out.write(b);out.flush();
             }
-        } finally {try{ipc.close();}finally{cleanup();}}
+        } finally {closeRealtimeSocket(ipc);cleanup();}
     }
 
     public static void main(String[] args) {
@@ -759,7 +902,7 @@ public class VmicPolicy {
             return;
         }
         if(mode.equals("rt")){
-            try{realtime(args[1],Long.parseLong(args[2]),Integer.parseInt(args[3]),Integer.parseInt(args[4]));}
+            try{realtime(args[1],Long.parseLong(args[2]),Integer.parseInt(args[3]),Integer.parseInt(args[4]),args.length>5?args[5]:null);}
             catch(Throwable t){t.printStackTrace();cleanup();System.exit(1);} finally{cleanup();} return;
         }
         if (mode.equals("mic")) {

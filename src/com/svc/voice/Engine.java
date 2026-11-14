@@ -60,6 +60,73 @@ public final class Engine implements AutoCloseable {
     public interface Log { void log(String s); }
     private Log log = s -> {};
 
+
+    // ───────────────── QNN / HTP 设备参数 ─────────────────
+
+    /**
+     * 统一构建 QNN(HTP) provider options。
+     *
+     * 依据设备真实 SoC（SocInfo.detect()，进程内只解析一次）下发：
+     *   htp_arch = 68/69/73/75/81（ORT 1.29 支持）；79/85 省略，由同版 QNN 自动探测
+     *   vtcm_mb  = 官方表给出的 VTCM（缺省不下发）
+     * 同时校验「本安装包内是否真有对应 skel」，缺库时明确拒绝上 NPU，而不是用别的架构顶替。
+     *
+     * 不传 soc_model：该值是 QNN SDK 内部 SoC 枚举，必须以对应 SDK 版本的头文件为准；
+     * 芯片表跨 SDK 版本，不能把其它版本的枚举直接用于 2.51；传错反而会失败。
+     * 因此交给 QNN 自己按 /sys/devices/soc0/soc_id 探测（skel 内部就这么做）。
+     */
+    private static Map<String,String> qnnOptions(Log log, String tag) {
+        Map<String,String> qo = new java.util.LinkedHashMap<String,String>();
+        qo.put("backend_type", "htp");
+        qo.put("htp_performance_mode", "burst");
+        qo.put("enable_htp_fp16_precision", "1");
+        SocInfo soc = SocInfo.detect();
+        if (log != null) {
+            log.log("QNN 设备识别[" + tag + "]：" + soc
+                    + (soc.known() ? "" : "（架构未知，不下发 htp_arch，由 QNN 自行探测）"));
+        }
+        if (soc.known()) {
+            if (SocInfo.skelAvailable(soc.arch)) {
+                if (soc.arch == 68 || soc.arch == 69 || soc.arch == 73 || soc.arch == 75 || soc.arch == 81) {
+                    qo.put("htp_arch", String.valueOf(soc.arch));
+                } else if (log != null) {
+                    log.log("ORT 1.29 不解析显式 htp_arch=" + soc.arch
+                            + "；已核对对应 Skel/Stub，交给 QNN 2.51 自动探测");
+                }
+                if (soc.vtcmMiB > 0) qo.put("vtcm_mb", String.valueOf(soc.vtcmMiB));
+            } else if (log != null) {
+                log.log("★ 本安装包缺少 libQnnHtpV" + soc.arch + "Skel.so / Stub.so（识别到 " + soc.socModel
+                        + " = " + SocInfo.archName(soc.arch) + "）；"
+                        + "已装架构=" + SocInfo.availableArches()
+                        + "。不会用其它架构顶替 → 该会话回退 CPU");
+            }
+        }
+        return qo;
+    }
+
+    /** 供 HTTP /config 直接返回的一句话设备结论（不含敏感信息） */
+    public static String socReport() {
+        SocInfo soc = SocInfo.detect();
+        String arch = soc.known() ? SocInfo.archName(soc.arch) : "unknown";
+        String usable = soc.known()
+                ? (SocInfo.skelAvailable(soc.arch) ? "htp" : "missing-skel")
+                : "unknown-arch";
+        return soc.socModel + "|" + arch + "|" + usable;
+    }
+
+    /** 是否允许对当前设备用 HTP：识别成功且本包内有对应 skel */
+    public static boolean htpUsable(Log log) {
+        SocInfo soc = SocInfo.detect();
+        boolean ok = soc.known() && SocInfo.skelAvailable(soc.arch);
+        if (log != null) {
+            log.log("HTP 可用性：" + (ok ? "是（" + soc.socModel + " → " + SocInfo.archName(soc.arch) + "）"
+                    : "否（" + (soc.known()
+                        ? "缺少 V" + soc.arch + " Skel/Stub，已装=" + SocInfo.availableArches()
+                        : "SoC 架构未知；不做推测") + "）"));
+        }
+        return ok;
+    }
+
     /**
      * 把一个模型现场编译成 HTP 机器码（EPContext）。
      * @param modelFile 要编译的 onnx
@@ -73,6 +140,15 @@ public final class Engine implements AutoCloseable {
             return 0;
         }
         if (!modelFile.isFile()) throw new Exception("找不到模型：" + modelFile);
+        SocInfo soc = SocInfo.detect();
+        if (soc.known() && !SocInfo.skelAvailable(soc.arch)) {
+            throw new Exception("NPU 编译中止：识别到 " + soc.socModel + " = " + SocInfo.archName(soc.arch)
+                    + "，但本安装包缺少 libQnnHtpV" + soc.arch + "Skel.so / Stub.so（已装="
+                    + SocInfo.availableArches() + "）。不会用其它架构顶替，改用 CPU");
+        }
+        if (!soc.known() && log != null) {
+            log.log("SoC 架构未知，按未知处理：不下发 htp_arch，交给 QNN 探测");
+        }
         OrtEnvironment env = OrtEnvironment.getEnvironment();
         OrtSession.SessionOptions q = new OrtSession.SessionOptions();
         try {
@@ -96,11 +172,8 @@ public final class Engine implements AutoCloseable {
                 q.setSessionLogVerbosityLevel(3);
                 log.log("ORT 日志级别已设为 VERBOSE");
             } catch (Throwable t) { log.log("开 VERBOSE 日志失败：" + t); }
-            java.util.Map<String, String> qo = new java.util.HashMap<String, String>();
-            qo.put("backend_type", "htp");
-            qo.put("htp_performance_mode", "burst");
+            java.util.Map<String, String> qo = qnnOptions(log, "compile");
             qo.put("htp_graph_finalization_optimization_mode", "3");
-            qo.put("enable_htp_fp16_precision", "1");
             File qbase = ctxFile.getParentFile() != null
                     ? ctxFile.getParentFile().getParentFile() : ctxFile.getParentFile();
             if (qbase != null) {
@@ -113,7 +186,10 @@ public final class Engine implements AutoCloseable {
                         if (ln.isEmpty() || ln.startsWith("#")) continue;
                         int eq = ln.indexOf(61);
                         if (eq <= 0) continue;
-                        qo.put(ln.substring(0, eq).trim(), ln.substring(eq + 1).trim());
+                        String ok = ln.substring(0, eq).trim(), ov = ln.substring(eq + 1).trim();
+                        if (log != null && ("htp_arch".equals(ok) || "soc_model".equals(ok) || "vtcm_mb".equals(ok)))
+                            log.log("qnn_opts.txt 覆盖 " + ok + "=" + ov + "（用户手动指定）");
+                        qo.put(ok, ov);
                     }
                     br.close();
                 }
@@ -195,7 +271,7 @@ public final class Engine implements AutoCloseable {
         if(!isEpContext(f))throw new Exception("没有 EPContext 节点："+f);
         try(OrtSession.SessionOptions o=new OrtSession.SessionOptions()) {
             o.setIntraOpNumThreads(Tune.threads());
-            Map<String,String> q=new HashMap<>(); q.put("backend_type","htp"); q.put("enable_htp_fp16_precision","1"); q.put("htp_performance_mode","burst"); o.addQnn(q);
+            o.addQnn(qnnOptions(null,"context"));
             OrtSession session=OrtEnvironment.getEnvironment().createSession(f.getAbsolutePath(),o);
             try {
                 if(model.equals("hubert.onnx")) {
@@ -344,7 +420,21 @@ public final class Engine implements AutoCloseable {
             hubert = env.createSession(new File(modelsDir,"hubert.onnx").getAbsolutePath(),opts6);
             rmvpe = env.createSession(new File(modelsDir,"rmvpe.onnx").getAbsolutePath(),opts6);
             log.log("常驻基础模型：Hubert CPU / RMVPE CPU pid="+android.os.Process.myPid());
-            if(npu) baseSession("rmvpe",352,rmvpe);
+            if (npu) {
+                SocInfo soc = SocInfo.detect();
+                if (!soc.known()) {
+                    log.log("NPU 已开启，但 SoC 架构未知（" + soc.socModel + "）；"
+                            + "不推测架构，QNN 会话将交由后端自行探测");
+                } else if (!SocInfo.skelAvailable(soc.arch)) {
+                    log.log("★ NPU 已开启，但本安装包缺少 " + SocInfo.archName(soc.arch)
+                            + " 的 Skel/Stub（识别到 " + soc.socModel + "，已装=" + SocInfo.availableArches()
+                            + "）。不会用其它架构顶替 → 本次全部回退 CPU");
+                } else {
+                    log.log("HTP 就绪：" + soc.socModel + " → " + SocInfo.archName(soc.arch)
+                            + (soc.vtcmMiB > 0 ? "，VTCM " + soc.vtcmMiB + "MB" : ""));
+                }
+                baseSession("rmvpe",352,rmvpe);
+            }
         } catch(Exception e) { close(); throw e; } finally {Tune.unpin(originalAffinity);}
     }
 

@@ -45,8 +45,83 @@ public final class Vmic {
     }
 
     /** 释放 helper、su 启动、连上 FIFO。失败返回 false（不影响耳机自听） */
-    private static android.net.LocalSocket captureSocket;
+    private static volatile android.net.LocalSocket captureSocket;
     private static android.net.LocalServerSocket captureServer;
+    private static volatile ProgressSession progressSession;
+
+    private static void closeServer(android.net.LocalServerSocket server) {
+        if (server == null) return;
+        // Android's close can wait behind a blocked accept. Shutdown wakes accept first.
+        try { android.system.Os.shutdown(server.getFileDescriptor(), android.system.OsConstants.SHUT_RDWR); }
+        catch (Throwable ignored) { }
+        try { server.close(); } catch (Throwable ignored) { }
+    }
+    private static void closeSocket(android.net.LocalSocket peer) {
+        if (peer == null) return;
+        try { peer.shutdownInput(); } catch (Throwable ignored) { }
+        try { peer.shutdownOutput(); } catch (Throwable ignored) { }
+        try { peer.close(); } catch (Throwable ignored) { }
+    }
+
+    /** Per-start owner: closing it unblocks both accept and read, including failed startup. */
+    private static final class ProgressSession {
+        final android.net.LocalServerSocket server;
+        final java.util.concurrent.FutureTask<android.net.LocalSocket> accept;
+        final Thread acceptThread;
+        volatile android.net.LocalSocket socket;
+        volatile Thread readerThread;
+        private boolean closed;
+        ProgressSession(String name) throws java.io.IOException {
+            server = new android.net.LocalServerSocket(name);
+            accept = new java.util.concurrent.FutureTask<>(() -> {
+                android.net.LocalSocket peer = server.accept();
+                synchronized (this) {
+                    if (closed) { peer.close(); throw new java.io.IOException("progress stopped"); }
+                    socket = peer;
+                }
+                return peer;
+            });
+            acceptThread = new Thread(accept, "progress-accept");
+            acceptThread.setDaemon(true); acceptThread.start();
+        }
+        void read(Context c, final int helperPid) {
+            Thread reader = new Thread(() -> {
+                try {
+                    android.net.LocalSocket peer = accept.get(2, java.util.concurrent.TimeUnit.SECONDS);
+                    android.net.Credentials cred = peer.getPeerCredentials();
+                    if (cred.getUid() != 0 || cred.getPid() != helperPid)
+                        throw new SecurityException("wrong progress helper peer");
+                    peer.setSoTimeout(1500);
+                    VmicProgressWire.Reader wire = new VmicProgressWire.Reader(
+                            new java.io.DataInputStream(peer.getInputStream()));
+                    for (;;) {
+                        VmicProgressWire.Frame frame = wire.read();
+                        synchronized (this) {
+                            if (closed || progressSession != this) return;
+                            WaveProbe.vmicPlayed(frame.effectiveHead48());
+                        }
+                    }
+                } catch (Throwable unavailable) {
+                    synchronized (this) {
+                        if (!closed && progressSession == this)
+                            diagnostic(c, "system AudioTrack progress unavailable: " + unavailable);
+                    }
+                } finally { close(); }
+            }, "progress-reader");
+            reader.setDaemon(true); readerThread = reader; reader.start();
+        }
+        synchronized void close() {
+            if (closed) return;
+            closed = true;
+            if (progressSession == this) WaveProbe.vmicPlayed(-1);
+            closeServer(server);
+            closeSocket(socket);
+            accept.cancel(true);
+            acceptThread.interrupt();
+            Thread reader = readerThread;
+            if (reader != null && reader != Thread.currentThread()) reader.interrupt();
+        }
+    }
     private static Process ownedRoot;
     private static String rtName;
     private static boolean realtimeOwned;
@@ -72,18 +147,24 @@ public final class Vmic {
             }
             rtName="svc-raw-"+java.util.UUID.randomUUID().toString();
             captureServer=new android.net.LocalServerSocket(rtName);
+            try { progressSession=new ProgressSession(rtName+"-progress"); }
+            catch (java.io.IOException unavailable) {
+                // Progress is optional: keep PCM capture alive and render play ? instead.
+                diagnostic(c,"progress listener unavailable: "+unavailable);
+            }
             final android.net.LocalServerSocket server=captureServer;
             final java.util.concurrent.FutureTask<android.net.LocalSocket> accept=new java.util.concurrent.FutureTask<>(()->server.accept());
             Thread t=new Thread(accept,"capture-accept");t.setDaemon(true);t.start();
             String dir=DIR+"/"+rtName;
-            String cmd="mkdir -p '"+dir+"' && chmod 755 '"+dir+"' && cp '"+dex+"' '"+dir+"/policy.dex' && chmod 644 '"+dir+"/policy.dex' && CLASSPATH='"+dir+"/policy.dex' exec /system/bin/app_process /system/bin VmicPolicy rt "+rtName+" "+uid+" "+android.os.Process.myUid()+" "+android.os.Process.myPid();
+            String cmd="mkdir -p '"+dir+"' && chmod 755 '"+dir+"' && cp '"+dex+"' '"+dir+"/policy.dex' && chmod 644 '"+dir+"/policy.dex' && CLASSPATH='"+dir+"/policy.dex' exec /system/bin/app_process /system/bin VmicPolicy rt "+rtName+" "+uid+" "+android.os.Process.myUid()+" "+android.os.Process.myPid()+(progressSession==null?"":" "+rtName+"-progress");
             diagnostic(c,"stage=execSu targetUid="+uid+" appUid="+android.os.Process.myUid()+" appPid="+android.os.Process.myPid());
             ownedRoot=execSu(cmd);
             if(ownedRoot==null)throw new java.io.IOException("su unavailable");
             final Process root=ownedRoot;
             Thread drain=new Thread(()->{try{BufferedReader r=new BufferedReader(new InputStreamReader(root.getInputStream()));String line;while((line=r.readLine())!=null)diagnostic(c,"helper: "+line); diagnostic(c,"helper exit="+root.waitFor());}catch(Throwable err){diagnostic(c,"drain failed: "+err);}},"capture-log");drain.setDaemon(true);drain.start();
             captureSocket=accept.get(8,java.util.concurrent.TimeUnit.SECONDS);
-            if(captureSocket.getPeerCredentials().getUid()!=0)throw new SecurityException("helper is not root");
+            android.net.Credentials helperPeer=captureSocket.getPeerCredentials();
+            if(helperPeer.getUid()!=0)throw new SecurityException("helper is not root");
             captureSocket.setSoTimeout(15000);
             java.io.DataInputStream input=new java.io.DataInputStream(captureSocket.getInputStream());
             if(input.readInt()!=0x53564337 || input.readInt()!=uid)throw new java.io.IOException("bad capture handshake");
@@ -92,10 +173,12 @@ public final class Vmic {
             if(state!=1||!"STARTED".equals(detail))throw new java.io.IOException("helper startup: "+detail);
             captureSocket.setSoTimeout(3000);
             sOut=captureSocket.getOutputStream();sPos=0;sBufN=0;sLast=0;helperStarted=true;
+            ProgressSession progress=progressSession;
+            if(progress!=null)progress.read(c,helperPeer.getPid());
             log(c,"target UID helper source6 48000 mono PCM16 ready uid="+uid);
             return true;
         }catch(Throwable t){synchronized(helperTail){startupError=t.toString()+"\n"+helperTail.toString();}diagnostic(c,"helper capture failed: "+startupError);stopRealtime();return false;}
-        finally{if(captureServer!=null)try{captureServer.close();}catch(Throwable ignored){} captureServer=null;}
+        finally{closeServer(captureServer); captureServer=null;}
     }
     public static int readCapture(byte[] b) throws Exception {
         android.net.LocalSocket socket=captureSocket;
@@ -103,10 +186,12 @@ public final class Vmic {
         int n=socket.getInputStream().read(b);if(n<0)throw new java.io.EOFException("capture EOF");return n;
     }
     public static void stopRealtime() {
+        ProgressSession progress=progressSession;
+        if(progress!=null){progress.close();if(progressSession==progress)progressSession=null;}
         if(captureSocket==null && rtName==null && captureServer==null)return;
         android.net.LocalSocket socket=captureSocket;captureSocket=null;
-        if(socket!=null)try{socket.close();}catch(Throwable ignored){}
-        if(captureServer!=null)try{captureServer.close();}catch(Throwable ignored){}
+        closeSocket(socket);
+        closeServer(captureServer);
         sOut=null;
         // socket EOF makes root release tracks/policy and close child stdin; no global kill.
         if(rtName!=null){final String dir=DIR+"/"+rtName;new Thread(()->{try{Thread.sleep(1000);}catch(Exception ignored){}sh("rm -rf '"+dir+"'");},"capture-files-cleanup").start();}
@@ -283,9 +368,9 @@ public final class Vmic {
     /**
      * 输入 44100Hz 的 short 样本，内部重采样到 48000 写进注入 AudioTrack。
      *
-     * <p>这里只统计“写进注入 sink 的字节数”。helper 侧没有把 AudioTrack 的
-     * getPlaybackHeadPosition（更别说接收 App 的读取量）回传上来，所以辅助条把它标成
-     * “vmic write”写入游标，不当成播放进度，也不做任何估计。
+     * <p>写入字节只作诊断。播放游标来自独立认证通道回传的 helper AudioTrack
+     * getPlaybackHeadPosition；无回报时显示未知，不用此处写入量估计。
+     * 系统 AudioTrack 播放不代表接收 App 已读取。
      */
     public static synchronized void feed44k(short[] in, int n) {
         feed44k(in, 0, n);
@@ -320,11 +405,11 @@ public final class Vmic {
             while (offset < sBufN) {
                 if (RealtimeService.stopReq || Thread.currentThread().isInterrupted()) return;
                 java.io.FileDescriptor fd = feedFd;
-                if(fd==null && sOut!=null){sOut.write(sBuf,offset,sBufN-offset); LiveWindowState.written(sBufN-offset);offset=sBufN;continue;}
+                if(fd==null && sOut!=null){sOut.write(sBuf,offset,sBufN-offset); LiveWindowState.written(sBufN-offset); WaveProbe.injected(sBufN-offset);offset=sBufN;continue;}
                 if (fd == null) throw new IllegalStateException("Vmic feed closed");
                 try {
                     int n = android.system.Os.write(fd, sBuf, offset, sBufN - offset);
-                    if (n > 0) { offset += n; LiveWindowState.written(n); } else Thread.sleep(5);
+                    if (n > 0) { offset += n; LiveWindowState.written(n); WaveProbe.injected(n); } else Thread.sleep(5);
                 } catch (android.system.ErrnoException e) {
                     if (e.errno != android.system.OsConstants.EAGAIN) throw e;
                     Thread.sleep(5);

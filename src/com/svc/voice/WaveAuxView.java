@@ -26,6 +26,9 @@ public final class WaveAuxView extends View {
     private final Paint bg = new Paint();
     private float[] peaks = new float[0];
     private float[] rms = new float[0];
+    private double displayCursor = Double.NaN;
+    private long lastFrameNs;
+    private long seenGeneration = -1;
     private long[] vp = new long[4];
 
     public WaveAuxView(Context c, Source s, float density) {
@@ -59,10 +62,36 @@ public final class WaveAuxView extends View {
         synchronized (st) {
             vp = st.viewport(span);
         }
-        long first = vp[0];
+        long[] cursors=WaveProbe.counters();
+        long played16=WaveProbe.playbackPosition16();
+        double input16=cursors[0];
+        long generation=(long)LiveWindowState.snapshot()[0];
+        long now=System.nanoTime();
+        if(Double.isNaN(displayCursor)||generation!=seenGeneration||input16<displayCursor){
+            displayCursor=input16;seenGeneration=generation;
+        }else{
+            double dt=lastFrameNs==0?0.016:Math.min(0.1,(now-lastFrameNs)/1e9);
+            displayCursor+=(input16-displayCursor)*(1-Math.exp(-dt/0.025));
+        }
+        lastFrameNs=now;
+        // Capture drives both rows; slow conversion never stops the shared time axis.
+        double firstCell=displayCursor/WaveStore.IN_PER_CELL-span*0.95;
+        float cx=(float)((played16/WaveStore.IN_PER_CELL-firstCell)*w/span);
+        cx=Math.max(0,Math.min(w,cx));
+        long first=(long)Math.floor(firstCell);
+        float offset=(float)((firstCell-first)*w/span);
+        canvas.save();
+        canvas.translate(-offset,0);
         drawTrace(canvas, st, WaveStore.SOURCE_INPUT, 0, half, first, span, 0xff66d9ef);
         drawTrace(canvas, st, WaveStore.SOURCE_OUTPUT, half, h, first, span, 0xffffb454);
-
+        canvas.restore();
+        axis.setColor(0xffeeff99);
+        if(played16>=0){
+            canvas.drawLine(cx,half+2,cx,h-2,axis);
+            canvas.drawLine(cx-6,half+2,cx+6,half+2,axis);
+            canvas.drawLine(cx-6,h-2,cx+6,h-2,axis);
+        }
+        axis.setColor(0x44ffffff);
         // Separator and the shared axis: the right edge is "now" for the newest trace.
         canvas.drawLine(0, half, w, half, axis);
         canvas.drawLine(w - 1, 0, w - 1, h, axis);
@@ -78,7 +107,7 @@ public final class WaveAuxView extends View {
                            long first, int span, int color) {
         if (!st.cells(which, first, span, peaks, rms)) return;
         long head = which == WaveStore.SOURCE_INPUT ? vp[1] : vp[2];
-        if (head < first || head >= first + span) return;   // fully outside the window
+        if (head < first) return;   // fully outside the window
         int w = getWidth();
         float mid = (top + bottom) / 2f;
         float amp = (bottom - top) / 2f - 2f;
@@ -91,6 +120,7 @@ public final class WaveAuxView extends View {
             float v = Math.max(peaks[i], rms[i]);
             float x = (i + 0.5f) * step;
             float y = mid - v * amp;
+            canvas.drawLine(x, mid-v*amp, x, mid+v*amp, line);
             if (x0 >= 0) canvas.drawLine(x0, y0, x, y, line);
             x0 = x;
             y0 = y;

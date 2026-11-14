@@ -1,0 +1,718 @@
+{
+ "generated": "2026-11-14",
+ "sources": [
+  "QAIRT 2.42.0.251225 docs/general/overview.html 设备表",
+  "pytorch/executorch backends/qualcomm/serialization/qc_schema.py _soc_info_table",
+  "qualcomm/ai-hub-models src/qai_hub_models/devices_and_chipsets.yaml"
+ ],
+ "rows": [
+  {
+   "soc": "QCM2290",
+   "arch": 0,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 83,
+   "note": "QCS/QCM2290",
+   "noHtp": true
+  },
+  {
+   "soc": "QCM4290",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 28,
+   "note": "460 (SM4250) 662 (SM6115) QCM4290"
+  },
+  {
+   "soc": "QCM4490",
+   "arch": 0,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 59,
+   "note": "QCM4490",
+   "noHtp": true
+  },
+  {
+   "soc": "QCM6125",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 19,
+   "note": "QCM6125"
+  },
+  {
+   "soc": "QCM6490",
+   "arch": 68,
+   "vtcmMiB": 2,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 35,
+   "note": "QCM6490"
+  },
+  {
+   "soc": "QCM6690",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 78,
+   "note": "QCS/QCM6690"
+  },
+  {
+   "soc": "QCM8550",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 66,
+   "note": "QCS/QCM8550"
+  },
+  {
+   "soc": "QCS410",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 33,
+   "note": "QCS410"
+  },
+  {
+   "soc": "QCS610",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 16,
+   "note": "QCS610"
+  },
+  {
+   "soc": "QCS6490",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 93,
+   "note": "Qualcomm® Dragonwing™ QCS6490"
+  },
+  {
+   "soc": "QCS7230",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 51,
+   "note": "QCS7230"
+  },
+  {
+   "soc": "QCS8275",
+   "arch": 75,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 82,
+   "note": "Qualcomm® Dragonwing™ IQ-8275"
+  },
+  {
+   "soc": "QCS8625",
+   "arch": 75,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 90,
+   "note": "QCS8625"
+  },
+  {
+   "soc": "QCS9075",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 77,
+   "note": "Qualcomm® Dragonwing™ IQ-9075"
+  },
+  {
+   "soc": "QCS9100",
+   "arch": 73,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 77,
+   "note": "QCS9100"
+  },
+  {
+   "soc": "QRB4210",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 49,
+   "note": "QRB4210"
+  },
+  {
+   "soc": "QRB5165",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 21,
+   "note": "QRB5165"
+  },
+  {
+   "soc": "SA8255",
+   "arch": 73,
+   "vtcmMiB": 8,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SA8295",
+   "arch": 68,
+   "vtcmMiB": 8,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SA8540",
+   "arch": 68,
+   "vtcmMiB": 8,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SA8797",
+   "arch": 81,
+   "vtcmMiB": 16,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SAR2130P",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 46,
+   "note": "AR2-Gen 1 (SAR2130P)"
+  },
+  {
+   "soc": "SAR2230P",
+   "arch": 81,
+   "vtcmMiB": 4,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SC7280X",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 44,
+   "note": "Snapdragon 7c Gen 2 (SC7280X)"
+  },
+  {
+   "soc": "SC8280X",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 37,
+   "note": "Snapdragon 8cx Gen 3 (SC8280X)"
+  },
+  {
+   "soc": "SC8340XP",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 60,
+   "note": "Snapdragon® X Plus 8-Core"
+  },
+  {
+   "soc": "SC8380XP",
+   "arch": 73,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 60,
+   "note": "Snapdragon 8cx Gen 4 (SC8380XP)"
+  },
+  {
+   "soc": "SC8480XP",
+   "arch": 81,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 88,
+   "note": "Snapdragon X2 Elite Extreme (SC8480XP)"
+  },
+  {
+   "soc": "SDM670",
+   "arch": 65,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 6,
+   "note": "Snapdragon® 670 Mobile"
+  },
+  {
+   "soc": "SDM845",
+   "arch": 65,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 1,
+   "note": "Snapdragon® 845 Mobile"
+  },
+  {
+   "soc": "SM4250",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 28,
+   "note": "460 (SM4250) 662 (SM6115) QCM4290"
+  },
+  {
+   "soc": "SM4350",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 31,
+   "note": "480 (SM4350) 695 (SM6375)"
+  },
+  {
+   "soc": "SM4450",
+   "arch": 0,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 59,
+   "note": "4 Gen 2 (SM4450)",
+   "noHtp": true
+  },
+  {
+   "soc": "SM6115",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 28,
+   "note": "460 (SM4250) 662 (SM6115) QCM4290"
+  },
+  {
+   "soc": "SM6225",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 40,
+   "note": "680 (SM6225)"
+  },
+  {
+   "soc": "SM6350",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 29,
+   "note": "750G (SM7225) 690 (SM6350)"
+  },
+  {
+   "soc": "SM6375",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 31,
+   "note": "480 (SM4350) 695 (SM6375)"
+  },
+  {
+   "soc": "SM6450",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 50,
+   "note": "6 Gen 1 (SM6450)"
+  },
+  {
+   "soc": "SM7225",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 29,
+   "note": "750G (SM7225) 690 (SM6350)"
+  },
+  {
+   "soc": "SM7250",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 25,
+   "note": "765 (SM7250)"
+  },
+  {
+   "soc": "SM7315",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 38,
+   "note": "SM7315"
+  },
+  {
+   "soc": "SM7325",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 35,
+   "note": "778G (SM7325)"
+  },
+  {
+   "soc": "SM7350",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 32,
+   "note": "780G (SM7350)"
+  },
+  {
+   "soc": "SM7450",
+   "arch": 69,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 41,
+   "note": "7 Gen 1 (SM7450)"
+  },
+  {
+   "soc": "SM7475",
+   "arch": 69,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 54,
+   "note": "7+ Gen 2 (SM7475)"
+  },
+  {
+   "soc": "SM7675",
+   "arch": 73,
+   "vtcmMiB": 4,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 70,
+   "note": "7+ Gen 3 (SM7675)"
+  },
+  {
+   "soc": "SM7750",
+   "arch": 73,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 86,
+   "note": "Snapdragon® 7 Gen 4 Mobile"
+  },
+  {
+   "soc": "SM8150",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 12,
+   "note": "Snapdragon® 855 Mobile"
+  },
+  {
+   "soc": "SM8250",
+   "arch": 66,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 21,
+   "note": "865 (SM8250)"
+  },
+  {
+   "soc": "SM8325",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 34,
+   "note": "SM8325"
+  },
+  {
+   "soc": "SM8350",
+   "arch": 68,
+   "vtcmMiB": 4,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 30,
+   "note": "888+ (SM8350P) 888 (SM8350)"
+  },
+  {
+   "soc": "SM8350P",
+   "arch": 68,
+   "vtcmMiB": 0,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表"
+   ],
+   "qnnSocModel": 30,
+   "note": "888+ (SM8350P) 888 (SM8350)"
+  },
+  {
+   "soc": "SM8450",
+   "arch": 69,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 36,
+   "note": "SD 8 Gen 1 (SM8450)"
+  },
+  {
+   "soc": "SM8475",
+   "arch": 69,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 42,
+   "note": "SD 8+ Gen 1 (SM8475)"
+  },
+  {
+   "soc": "SM8550",
+   "arch": 73,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 43,
+   "note": "SD 8 Gen 2 (SM8550)"
+  },
+  {
+   "soc": "SM8635",
+   "arch": 73,
+   "vtcmMiB": 4,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 68,
+   "note": "8s Gen 3 (SM8635)"
+  },
+  {
+   "soc": "SM8650",
+   "arch": 75,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table",
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 57,
+   "note": "SD 8 Gen 3 (SM8650)"
+  },
+  {
+   "soc": "SM8750",
+   "arch": 79,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 69,
+   "note": "SD 8 Elite (SM8750)"
+  },
+  {
+   "soc": "SM8845",
+   "arch": 81,
+   "vtcmMiB": 8,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SM8850",
+   "arch": 81,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 87,
+   "note": "SD 8 Elite Gen 5 (SM8850)"
+  },
+  {
+   "soc": "SM8950",
+   "arch": 85,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 113,
+   "note": "Snapdragon® 8 Elite Gen 6 Mobile"
+  },
+  {
+   "soc": "SM8975",
+   "arch": 85,
+   "vtcmMiB": 0,
+   "sources": [
+    "Qualcomm AI Hub devices_and_chipsets.yaml"
+   ],
+   "qnnSocModel": 103,
+   "note": "Snapdragon® 8 Elite Extreme Gen 6 Mobile"
+  },
+  {
+   "soc": "SSG2115P",
+   "arch": 73,
+   "vtcmMiB": 2,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 46,
+   "note": "AR1-Gen1 Luna1 (SSG2115P)"
+  },
+  {
+   "soc": "SSG2125P",
+   "arch": 73,
+   "vtcmMiB": 2,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 58,
+   "note": "AR1-Gen1 Luna2 (SSG2125P)"
+  },
+  {
+   "soc": "SW6100",
+   "arch": 81,
+   "vtcmMiB": 4,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SXR1230P",
+   "arch": 73,
+   "vtcmMiB": 2,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  },
+  {
+   "soc": "SXR2230P",
+   "arch": 69,
+   "vtcmMiB": 8,
+   "sources": [
+    "QAIRT 2.42 SDK 设备表",
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 53,
+   "note": "XR2-Gen 2 (SXR2230P)"
+  },
+  {
+   "soc": "SXR2330P",
+   "arch": 79,
+   "vtcmMiB": 8,
+   "sources": [
+    "executorch qc_schema _soc_info_table"
+   ],
+   "qnnSocModel": 0,
+   "note": ""
+  }
+ ]
+}

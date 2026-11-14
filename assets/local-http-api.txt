@@ -32,7 +32,7 @@ Requires name + file ZIP. Existing role: 409. Extracts to private temporary
 storage with streaming reads, then passes the extracted model directory to
 RoleImporter.importRole(directory, stagingOutput, baseDir/tpl, log).
 Publishes staging output only on success. Always attempts temporary cleanup.
-Templates must already exist in baseDir/tpl. Import can take time; it is not
+Missing templates in baseDir/tpl are restored from bundled assets before import. Import can take time; it is not
 an asynchronous task. The upload deadline ends before execution; a disconnected
 client does not interrupt import, and should query roles before retrying.
 ZIP: <=4096 entries, <=8 GiB extracted total, <=4 GiB per entry,
@@ -53,7 +53,8 @@ files are an idempotent success. Engine cache is released before changes.
 GET /logs -> 200 {"log":"..."}, last <=65536 bytes of app.log with partial
 first line omitted. DELETE -> 200 {"cleared":true}. Only application app.log;
 never clears helper logs or invokes su.
-PUT /config -> synchronous 200 {"npu":true,"threads":6}.
+PUT /config -> synchronous 200 {"npu":true,"threads":6,"soc":"SM8850|v81|htp"}.
+soc reports model|architecture|library status; it is diagnostic, not proof of successful NPU inference.
 npu is strictly true/false; threads integer 1..8. Missing fields retain current
 Prefs values. Releases Engine before updating Prefs and Engine.device, then reloads the current
 UI role when selected, following the existing configuration activation path.

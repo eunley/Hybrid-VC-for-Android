@@ -1688,8 +1688,6 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 File tplDir = new File(prefs.baseDir(), "tpl");
-                if (!new File(tplDir, "enc.onnx").exists())
-                    throw new IOException("missing template dir " + tplDir);
                 File outDir = new File(prefs.rolesDir(), base);
                 RoleImporter.Result r = RoleImporter.importRole(src, outDir, tplDir, this::log);
                 log("role imported " + r.roleName + " tensors=" + r.tensorCount

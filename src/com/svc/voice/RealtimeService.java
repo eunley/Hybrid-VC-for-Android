@@ -89,6 +89,7 @@ public class RealtimeService extends Service {
             LiveWindowState.stopped();
             unblockAudio();
             joinAudio(micThread); joinAudio(outputThread);
+            WaveProbe.played(-1);
             activeRecord = null;
             stopMonitor();
             OutputEnvelope.clear(OutputEnvelope.LIVE);
@@ -232,6 +233,7 @@ public class RealtimeService extends Service {
             LiveWindowState.reset(win, hop);
             LiveWindowState.running = true;
             WaveProbe.reset();
+            WaveProbe.virtualMic(inj);
             final java.util.concurrent.LinkedBlockingQueue<float[]> inputs = new java.util.concurrent.LinkedBlockingQueue<>();
             final java.util.concurrent.LinkedBlockingQueue<WaveBlock> outputs = new java.util.concurrent.LinkedBlockingQueue<>();
             final java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
@@ -256,13 +258,13 @@ public class RealtimeService extends Service {
                         if(inject)n=Vmic.readCapture(bytes);
                         else {int k=capture.read(raw,0,Math.min(raw.length,480));if(k<0)throw new IllegalStateException("AudioRecord.read="+k);n=k*2;for(int i=0;i<k;i++){bytes[2*i]=(byte)raw[i];bytes[2*i+1]=(byte)(raw[i]>>8);}}
                         float[] converted=converter.accept(bytes,n);
+                        WaveProbe.inputStart(inPos);
+                        if(WaveProbe.running()) WaveProbe.inputBlock(converted,converted.length);
+                        else WaveProbe.skipInput(converted.length);
+                        inPos+=converted.length;
                         for(float v:converted){block[used++]=v;LiveWindowState.inputQuiet(1);
                             if(used==hop){
                                 // 坐标先落位再入队：辅助条看到的时间轴与推理输入严格一致
-                                WaveProbe.inputStart(inPos);
-                                inPos+=hop;
-                                if(WaveProbe.running())WaveProbe.inputBlock(block,hop);
-                                else WaveProbe.skipInput(hop);
                                 inputs.add(block);LiveWindowState.pendingBlocks=inputs.size();block=new float[hop];used=0;}}
 
                     }
@@ -271,13 +273,14 @@ public class RealtimeService extends Service {
             outputThread = new Thread(() -> {
                 try {
                     while (running && !stopReq) {
-                        WaveBlock wb = outputs.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        if(!inject) WaveProbe.played(WaveStore.unsigned32(playback.getPlaybackHeadPosition()));
+                        WaveBlock wb = outputs.poll(33, java.util.concurrent.TimeUnit.MILLISECONDS);
                         if (wb == null) continue;
                         short[] chunk = wb.pcm;
                         if (inject) {
-                            // helper 侧写入：只记写入字节数（写入游标），不冒称接收 App 已读取
+                            // 写入仅作诊断；播放头由独立进度通道回报，不代表接收 App 已读取
                             Vmic.feed44k(chunk, 0, chunk.length);
-                            WaveProbe.injected(chunk.length * 2);
+
                         } else {
                             int off = 0;
                             // AudioTrack 的 head 从 0 起、只按本 track 的消费量前进，
@@ -293,7 +296,7 @@ public class RealtimeService extends Service {
                                 // 32 位无符号：int 读法在累计 2^31 样本后变负，必须按位掩码取增量
                                 long delta = WaveStore.unsignedDelta(WaveStore.unsigned32(raw), WaveStore.unsigned32(lastHead));
                                 lastHead = raw;
-                                WaveProbe.played(playBase[0] + delta);
+                                WaveProbe.played(WaveStore.unsigned32(raw));
                             }
                         }
                         if (!stopReq) OutputEnvelope.submit(OutputEnvelope.LIVE, envelopeToken, chunk, 0, chunk.length, Engine.SR_OUT);
@@ -346,6 +349,7 @@ public class RealtimeService extends Service {
             LiveWindowState.stopped();
             unblockAudio();
             joinAudio(micThread); joinAudio(outputThread);
+            WaveProbe.played(-1);
             activeRecord = null;
             if(monitor!=null)monitor.close();
             OutputEnvelope.clear(OutputEnvelope.LIVE);

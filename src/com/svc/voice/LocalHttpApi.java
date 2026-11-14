@@ -8,6 +8,14 @@ import java.util.concurrent.*;
 import java.util.zip.*;
 import org.json.*;
 public final class LocalHttpApi implements LocalHttpWire.Handler,AutoCloseable {
+    /** 设备 SoC/HTP 结论；用反射取，便于测试桩环境与旧 Engine 共存 */
+    private static String socText() {
+        try {
+            java.lang.reflect.Method m = Engine.class.getMethod("socReport");
+            Object v = m.invoke(null);
+            return v == null ? "unknown|unknown|unknown-arch" : String.valueOf(v);
+        } catch (Throwable t) { return "unknown|unknown|unknown-arch"; }
+    }
  private UploadStore uploads;
  private final Prefs prefs; private final RoleStore roles; private final File work;
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -33,7 +41,7 @@ public final class LocalHttpApi implements LocalHttpWire.Handler,AutoCloseable {
  if(p.equals("/api/v1/uploads")||p.startsWith("/api/v1/uploads/"))return uploads.handle(r);
  if(p.equals("/api/v1/roles")&&m.equals("GET")){JSONArray a=new JSONArray();for(File f:roles.list())a.put(json("name",f.getName(),"compiled",new JSONArray(Engine.listCompiled(f))));return reply(200,json("roles",a));}
  if(p.equals("/api/v1/roles/import")&&m.equals("POST"))return importRole(r);
- if(p.equals("/api/v1/config")&&m.equals("PUT")){String token=lock();try{boolean n=bool(r,"npu",prefs.device().equals("npu"));int t=num(r,"threads",prefs.cpuThreads(),1,8);Engine.release();prefs.setDevice(n?"npu":"cpu");prefs.setCpuThreads(t);Engine.device=prefs.device();MainActivity.modelReady=false;if(!prefs.roleDir().isEmpty()){Engine engine=Engine.acquire(prefs.modelsDir(),this::log);engine.loadRole(prefs.roleDir(),prefs.fileFrames());MainActivity.modelReady=true;}return reply(200,json("npu",n,"threads",t));}finally{unlock(token);}}
+ if(p.equals("/api/v1/config")&&m.equals("PUT")){String token=lock();try{boolean n=bool(r,"npu",prefs.device().equals("npu"));int t=num(r,"threads",prefs.cpuThreads(),1,8);Engine.release();prefs.setDevice(n?"npu":"cpu");prefs.setCpuThreads(t);Engine.device=prefs.device();MainActivity.modelReady=false;if(!prefs.roleDir().isEmpty()){Engine engine=Engine.acquire(prefs.modelsDir(),this::log);engine.loadRole(prefs.roleDir(),prefs.fileFrames());MainActivity.modelReady=true;}return reply(200,json("npu",n,"threads",t,"soc",socText()));}finally{unlock(token);}}
  if(p.equals("/api/v1/logs")){if(m.equals("GET"))return reply(200,json("log",AppLog.tail(prefs.baseDir())));if(m.equals("DELETE")){String token=lock();try{synchronized(AppLog.class){try(RandomAccessFile f=new RandomAccessFile(new File(prefs.baseDir(),"app.log"),"rw")){f.setLength(0);}AppLog.generation++;AppLog.revision++;}return reply(200,json("cleared",true));}finally{unlock(token);}}}
  if(p.startsWith("/api/v1/roles/")){String[] a=p.substring(14).split("/",-1);
  if(a.length==1&&m.equals("DELETE")){String token=lock();try{File f=role(a[0]);Engine.release();RoleStore.deleteTree(f);return reply(200,json("deleted",true));}finally{unlock(token);}}

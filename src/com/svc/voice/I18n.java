@@ -6,7 +6,7 @@ import android.content.res.Resources;
 import android.os.Build;
 import java.util.Locale;
 
-/** App-only locale override. First launch is English; system following is explicit. */
+/** App-only locale override. First launch follows the system; explicit user selections are preserved. */
 public final class I18n {
     private I18n() {}
 
@@ -25,7 +25,7 @@ public final class I18n {
     }
 
     public static int languageIndex(Context c) {
-        String code = c.getSharedPreferences("svc", Context.MODE_PRIVATE).getString("lang", "en");
+        String code = c.getSharedPreferences("svc", Context.MODE_PRIVATE).getString("lang", "system");
         if ("auto".equals(code)) code = "system";
         if (code != null && !"system".equals(code)) {
             String tag = code.replace('_', '-');
@@ -44,9 +44,9 @@ public final class I18n {
     }
 
     public static Locale pick(Context c) {
-        String mode = "en";
+        String mode = "system";
         try {
-            mode = c.getSharedPreferences("svc", Context.MODE_PRIVATE).getString("lang", "en");
+            mode = c.getSharedPreferences("svc", Context.MODE_PRIVATE).getString("lang", "system");
         } catch (Throwable ignore) {}
         if ("system".equalsIgnoreCase(mode) || "auto".equalsIgnoreCase(mode)) {
             Configuration cf = Resources.getSystem().getConfiguration();

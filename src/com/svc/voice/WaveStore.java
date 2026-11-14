@@ -142,6 +142,12 @@ public final class WaveStore {
         revision++;
     }
 
+    /** Seed a newly attached display without moving the absolute sample boundary. */
+    public synchronized void alignInput(long position) {
+        if(position<=inTotal)return;
+        inTotal=position;inFill=(int)(position%IN_PER_CELL);inPeak=inSumSq=0;
+    }
+
     /** Store 44.1 kHz int16 PCM occupying absolute output range [start44, start44 + n). */
     public synchronized void pushOutput(short[] x, int off, int n, long start44) {
         if (n <= 0) return;

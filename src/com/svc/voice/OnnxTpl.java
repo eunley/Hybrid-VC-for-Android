@@ -146,7 +146,7 @@ public final class OnnxTpl {
             ByteBuffer bb = ByteBuffer.wrap(out).order(ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < cnt; i++) {
                 int h = (raw[i * 2] & 0xFF) | ((raw[i * 2 + 1] & 0xFF) << 8);
-                bb.putFloat(Float.float16ToFloat((short) h));
+                bb.putFloat(halfToFloat(h));
             }
             PB.removeAll(t, 13);
             PB.removeAll(t, 14);
@@ -206,11 +206,41 @@ public final class OnnxTpl {
         dimOverrides.put(name, dims);
     }
 
+    /** IEEE 754 binary16 conversion without newer Android runtime APIs. */
+    static float halfToFloat(int h) {
+        int sign = (h & 0x8000) << 16;
+        int exp = (h >>> 10) & 31, frac = h & 1023;
+        if (exp == 0) {
+            if (frac == 0) return Float.intBitsToFloat(sign);
+            exp = -14;
+            while ((frac & 1024) == 0) { frac <<= 1; exp--; }
+            return Float.intBitsToFloat(sign | ((exp + 127) << 23) | ((frac & 1023) << 13));
+        }
+        return Float.intBitsToFloat(sign | (exp == 31 ? 0x7f800000 : ((exp + 112) << 23)) | (frac << 13));
+    }
+
+    /** Round to nearest, ties to even, preserving signed zero and NaN. */
+    static int floatToHalf(float value) {
+        int bits = Float.floatToRawIntBits(value);
+        int sign = (bits >>> 16) & 0x8000;
+        int exp = (bits >>> 23) & 255, frac = bits & 0x7fffff;
+        if (exp == 255) return sign | 0x7c00 | (frac == 0 ? 0 : ((frac >>> 13) | 0x200));
+        int he = exp - 112;
+        if (he >= 31) return sign | 0x7c00;
+        if (he < -10) return sign;
+        int mant = he <= 0 ? frac | 0x800000 : frac;
+        int shift = he <= 0 ? 14 - he : 13;
+        int rounded = mant >>> shift;
+        int rem = mant & ((1 << shift) - 1), halfway = 1 << (shift - 1);
+        if (rem > halfway || (rem == halfway && (rounded & 1) != 0)) rounded++;
+        return sign | ((he <= 0 ? 0 : he << 10) + rounded);
+    }
+
     /** fp32 → fp16 的原始字节（小端） */
     public static byte[] toFp16Bytes(float[] v) {
         byte[] out = new byte[v.length * 2];
         for (int i = 0; i < v.length; i++) {
-            int h = Float.floatToFloat16(v[i]);
+            int h = floatToHalf(v[i]);
             out[i*2]   = (byte) (h & 0xFF);
             out[i*2+1] = (byte) ((h >> 8) & 0xFF);
         }
