@@ -50,6 +50,29 @@ See [local-http-api.txt](assets/local-http-api.txt) for the API reference and [u
 
 The current build has primarily been tested on a **realme GT8 Pro (RMX5200), running Android 16 with a Snapdragon 8 Elite Gen 5 (SM8850)**. Compatibility and performance on other devices have not been thoroughly verified.
 
+### Devices that may support NPU acceleration
+
+The current APK bundles HTP runtimes for V69/V73/V75/V79/V81/V85. If the app recognizes one of the Qualcomm SoCs below and the voice model can be compiled for the NPU on the device, HTP acceleration may be available. This table means that a matching runtime and SoC mapping are packaged; it is **not per-device validation or a performance guarantee**. SoC suffixes `-AA/-AB/-AC/-AD` are normalized to the base model.
+
+| SoC | Common name | Packaged HTP |
+| --- | --- | --- |
+| SM8950 | Snapdragon 8 Elite Gen 6 | V85 |
+| SM8975 | Snapdragon 8 Elite Extreme Gen 6 | V85 |
+| SM8850 / SM8850-AD | Snapdragon 8 Elite Gen 5 | V81 |
+| SM8750 / SM8750-AC | Snapdragon 8 Elite (SM8750-AC is the Galaxy S25 OC variant) | V79 |
+| SM8650 | Snapdragon 8 Gen 3 | V75 |
+| SM8550 | Snapdragon 8 Gen 2 | V73 |
+| SM8635 | Snapdragon 8s Gen 3 | V73 |
+| SM7675 | Snapdragon 7+ Gen 3 | V73 |
+| SM7750 | Snapdragon 7s / 7 Gen 4 | V73 |
+| SM6450 | Snapdragon 6 Gen 1 | V73 |
+| SM8450 | Snapdragon 8 Gen 1 | V69 |
+| SM8475 | Snapdragon 8+ Gen 1 | V69 |
+| SM7450 | Snapdragon 7 Gen 1 | V69 |
+| SM7475 | Snapdragon 7+ Gen 2 | V69 |
+
+This is not a complete Snapdragon SoC list; omission does not necessarily mean a device is unsupported. Development testing still centers on SM8850, and V85 has not been validated on real hardware. Even on the same SoC, vendor firmware, FastRPC/DSP permissions, Android version, available memory and model size can make NPU initialization or compilation fail, in which case CPU fallback may be needed.
+
 Basic workflow:
 
 1. Install the app and grant the required permissions.
