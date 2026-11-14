@@ -41,6 +41,10 @@ public final class FloatingMenuService extends Service {
     private int iconY=160, menuX=24, menuY=160;
     private Switch live;
     /* ---- 快捷录音 UI（只做交互与结果展示，录音在 QuickVoiceService，转换在 JobService） ---- */
+    /** 实时双波形辅助条：独立可拖动窗口，开关键存到 Prefs，关闭时彻底释放 */
+    private WaveAuxWindow wave;
+    private Switch waveSwitch;
+    private static final String PREF_WAVE_AUX="wave_aux";
     private TextView quickRec, quickPlay, quickStatus;
     private android.media.MediaPlayer player;   // 外放播放，用完即 release
     private String playPath;                    // 仅本次成功输出，失败/新一轮录音会清空
@@ -50,10 +54,27 @@ public final class FloatingMenuService extends Service {
     private final Runnable tick=new Runnable(){public void run(){
         if(!canDraw(FloatingMenuService.this)){stopSelf();return;}
         if(live!=null){syncing=true;live.setChecked(RealtimeService.running);syncing=false;}
+        if(wave!=null)wave.setPublishing(true);
         refreshQuick();
         refreshRtf();
         handler.postDelayed(this,500);
     }};
+    private boolean wavePref(){return getSharedPreferences("svc",MODE_PRIVATE).getBoolean(PREF_WAVE_AUX,false);}
+    private void setWavePref(boolean on){getSharedPreferences("svc",MODE_PRIVATE).edit().putBoolean(PREF_WAVE_AUX,on).apply();}
+    /** 打开=创建可拖动辅助条并开始写入；关闭=立即拆窗口、拦掉所有回调、清空环形存储 */
+    private void applyWave(boolean on){
+        if(on){
+            if(!canDraw(this)){toast(I18n.text(this,R.string.ov_wave_need_permission));return;}
+            if(wave==null)wave=new WaveAuxWindow(this);
+            if(!wave.show()){wave=null;toast(I18n.text(this,R.string.ov_wave_need_permission));return;}
+            WaveProbe.attach(wave.store());
+            wave.setPublishing(true);
+        }else if(wave!=null){
+            WaveProbe.detach(wave.store());
+            wave.destroy();
+            wave=null;
+        }
+    }
     private int dp(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private int sw(){return getResources().getDisplayMetrics().widthPixels;}
     private int sh(){return getResources().getDisplayMetrics().heightPixels;}
@@ -77,10 +98,12 @@ public final class FloatingMenuService extends Service {
             .setContentIntent(open).addAction(new Notification.Action.Builder(null,I18n.text(FloatingMenuService.this,R.string.ov_menu_close),close).build()).setOngoing(true).build();
         if(Build.VERSION.SDK_INT>=34)startForeground(NOTIFICATION,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         else startForeground(NOTIFICATION,n);
-        if(root==null){active=true;render();handler.post(tick);}
+        if(root==null){active=true;render();handler.post(tick);
+            // 恢复上次的开关状态；麦克风没起来也允许开（坐标从 0 起，打开后才记录）
+            if(wavePref())applyWave(true);}
         return START_NOT_STICKY;
     }
-    private void removeRoot(){if(root!=null){try{wm.removeView(root);}catch(RuntimeException ignored){}root=null;}live=null;controlTitle=null;quickRec=null;quickPlay=null;quickStatus=null;}
+    private void removeRoot(){if(root!=null){try{wm.removeView(root);}catch(RuntimeException ignored){}root=null;}live=null;controlTitle=null;quickRec=null;quickPlay=null;quickStatus=null;waveSwitch=null;}
     private void refreshRtf(){
         if(controlTitle==null)return;
         double r=LiveWindowState.snapshot()[7];
@@ -115,6 +138,17 @@ public final class FloatingMenuService extends Service {
             installMenuDrag(top);installMenuDrag(title);panel.addView(top);
             live=new Switch(this);live.setText(I18n.text(FloatingMenuService.this,R.string.ov_realtime));live.setTextColor(Color.WHITE);live.setChecked(RealtimeService.running);panel.addView(live);
             live.setOnCheckedChangeListener((b,on)->{if(!syncing)toggleLive(on);});
+            waveSwitch=new Switch(this);
+            waveSwitch.setText(I18n.text(FloatingMenuService.this,R.string.ov_wave_switch));
+            waveSwitch.setTextColor(Color.WHITE);
+            waveSwitch.setChecked(wave!=null);
+            waveSwitch.setOnCheckedChangeListener((b,on)->{
+                if(syncing)return;
+                setWavePref(on);
+                applyWave(on);
+                syncing=true;b.setChecked(wave!=null);syncing=false;
+            });
+            panel.addView(waveSwitch);
             LinearLayout quickRow=new LinearLayout(this);quickRow.setOrientation(LinearLayout.HORIZONTAL);
             quickRow.setPadding(0,dp(6),0,0);
             quickRec=chip();quickPlay=chip();
@@ -252,6 +286,8 @@ public final class FloatingMenuService extends Service {
         // 关浮窗：不自动转，直接丢弃正在进行的录音；播放器必须释放
         if(QuickVoiceService.recording)QuickVoiceService.abort(this);
         stopPlayer();
-        handler.removeCallbacksAndMessages(null);removeRoot();active=false;stopForeground(true);super.onDestroy();}
+        handler.removeCallbacksAndMessages(null);
+        if(wave!=null){WaveProbe.detach(wave.store());wave.destroy();wave=null;}
+        removeRoot();active=false;stopForeground(true);super.onDestroy();}
     @Override public IBinder onBind(Intent i){return null;}
 }

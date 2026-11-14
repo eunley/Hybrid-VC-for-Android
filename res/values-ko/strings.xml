@@ -358,4 +358,6 @@
     <string name="ui_volume_limit">출력 음량 제한</string>
     <string name="ui_volume_limit_file_hint">기본값은 꺼짐이며 잡음 감소와 독립적입니다. 약 20밀리초 출력 RMS를 원본 입력 이하로, 피크를 1 이하로 제한합니다. 일괄 변환과 빠른 녹음에도 적용됩니다.</string>
     <string name="ui_volume_limit_live_hint">기본값은 꺼짐이며 잡음 감소와 독립적입니다. 약 20밀리초 출력 RMS를 원본 입력 이하로, 피크를 1 이하로 제한합니다. 다음 실시간 변환 시작 시 적용됩니다.</string>
+    <string name="ov_wave_switch">입력/출력 파형 막대</string>
+    <string name="ov_wave_need_permission">파형 막대를 표시하려면 오버레이 권한이 필요합니다</string>
 </resources>

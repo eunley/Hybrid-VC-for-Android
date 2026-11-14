@@ -231,12 +231,16 @@ public class RealtimeService extends Service {
             LiveWindowState.processedBlocks = 0;
             LiveWindowState.reset(win, hop);
             LiveWindowState.running = true;
+            WaveProbe.reset();
             final java.util.concurrent.LinkedBlockingQueue<float[]> inputs = new java.util.concurrent.LinkedBlockingQueue<>();
-            final java.util.concurrent.LinkedBlockingQueue<short[]> outputs = new java.util.concurrent.LinkedBlockingQueue<>();
+            final java.util.concurrent.LinkedBlockingQueue<WaveBlock> outputs = new java.util.concurrent.LinkedBlockingQueue<>();
             final java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
             final AudioRecord capture = rec;
             final AudioTrack playback = track;
             final boolean inject = inj;
+            // 辅助条只在这两个条件都成立时刷新；关闭时坐标仍连续，只是不落图形
+            // 每个块重新问一次：开关可能在中途被打开，届时坐标从当前绝对位置继续画
+            final long[] playBase = {-1};
             micThread = new Thread(() -> {
                 try {
                     short[] raw = new short[Math.max(3, hop * 3)];
@@ -244,6 +248,8 @@ public class RealtimeService extends Service {
                     int used = 0;
                     byte[] bytes=new byte[960];
                     Pcm48To16 converter=new Pcm48To16();
+                    // 绝对 16k 采样坐标：一个分片一个窗口，块起点=已交付的 16k 样本数
+                    long inPos=0;
                     while (running && !stopReq) {
                         LiveWindowState.publish();
                         int n;
@@ -251,7 +257,13 @@ public class RealtimeService extends Service {
                         else {int k=capture.read(raw,0,Math.min(raw.length,480));if(k<0)throw new IllegalStateException("AudioRecord.read="+k);n=k*2;for(int i=0;i<k;i++){bytes[2*i]=(byte)raw[i];bytes[2*i+1]=(byte)(raw[i]>>8);}}
                         float[] converted=converter.accept(bytes,n);
                         for(float v:converted){block[used++]=v;LiveWindowState.inputQuiet(1);
-                            if(used==hop){inputs.add(block);LiveWindowState.pendingBlocks=inputs.size();block=new float[hop];used=0;}}
+                            if(used==hop){
+                                // 坐标先落位再入队：辅助条看到的时间轴与推理输入严格一致
+                                WaveProbe.inputStart(inPos);
+                                inPos+=hop;
+                                if(WaveProbe.running())WaveProbe.inputBlock(block,hop);
+                                else WaveProbe.skipInput(hop);
+                                inputs.add(block);LiveWindowState.pendingBlocks=inputs.size();block=new float[hop];used=0;}}
 
                     }
                 } catch (Throwable t) { if (!stopReq) failure.compareAndSet(null, t); }
@@ -259,15 +271,29 @@ public class RealtimeService extends Service {
             outputThread = new Thread(() -> {
                 try {
                     while (running && !stopReq) {
-                        short[] chunk = outputs.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
-                        if (chunk == null) continue;
-                        if (inject) Vmic.feed44k(chunk, 0, chunk.length);
-                        else {
+                        WaveBlock wb = outputs.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        if (wb == null) continue;
+                        short[] chunk = wb.pcm;
+                        if (inject) {
+                            // helper 侧写入：只记写入字节数（写入游标），不冒称接收 App 已读取
+                            Vmic.feed44k(chunk, 0, chunk.length);
+                            WaveProbe.injected(chunk.length * 2);
+                        } else {
                             int off = 0;
+                            // AudioTrack 的 head 从 0 起、只按本 track 的消费量前进，
+                            // 而分片的 start 是整条绝对时间轴。用「已开始消费的绝对样本」作基准，
+                            // 每次把无符号 head 的增量加上去，回绕时就自然进位。
+                            if (playBase[0] < 0) playBase[0] = wb.start;
+                            int lastHead = playback.getPlaybackHeadPosition();
                             while (off < chunk.length && running && !stopReq) {
                                 int n = playback.write(chunk, off, chunk.length - off, AudioTrack.WRITE_NON_BLOCKING);
                                 if (n < 0) throw new IllegalStateException("AudioTrack.write=" + n);
                                 if (n == 0) Thread.sleep(5); else off += n;
+                                int raw = playback.getPlaybackHeadPosition();
+                                // 32 位无符号：int 读法在累计 2^31 样本后变负，必须按位掩码取增量
+                                long delta = WaveStore.unsignedDelta(WaveStore.unsigned32(raw), WaveStore.unsigned32(lastHead));
+                                lastHead = raw;
+                                WaveProbe.played(playBase[0] + delta);
                             }
                         }
                         if (!stopReq) OutputEnvelope.submit(OutputEnvelope.LIVE, envelopeToken, chunk, 0, chunk.length, Engine.SR_OUT);
@@ -280,7 +306,14 @@ public class RealtimeService extends Service {
             final long[] blocks={0};
             ChunkPipeline core=new ChunkPipeline(engine.frames(),fade,
                 segment->engine.convert(segment,frozenPitch),
-                (audio,start)->{short[] pcm=new short[audio.length];for(int i=0;i<pcm.length;i++)pcm[i]=(short)(Math.max(-1f,Math.min(1f,audio[i]))*32767f);outputs.add(pcm);if(inject)monitor.offer(pcm,p.monitorEnabled());},
+                (audio,start)->{
+                    short[] pcm=new short[audio.length];
+                    for(int i=0;i<pcm.length;i++)pcm[i]=(short)(Math.max(-1f,Math.min(1f,audio[i]))*32767f);
+                    // start 是 44.1k 绝对样本；转成 short 不改变长度，与写入 AudioTrack/helper 的区间一致
+                    WaveProbe.outputCommitted(pcm,start);
+                    outputs.add(new WaveBlock(pcm,start));
+                    if(inject)monitor.offer(pcm,p.monitorEnabled());
+                },
                 new ChunkPipeline.Observer(){
                     public void begin(long start,int real){LiveWindowState.begin(start+real);}
                     public void complete(long start,int real,long ns){
@@ -331,6 +364,13 @@ public class RealtimeService extends Service {
     private static final boolean needAec = false;
 
     private static long sample44(long sample16) { return Math.round(sample16*(double)Engine.SR_OUT/Engine.SR_IN); }
+
+    /** 转换结果 + 它在 44.1k 绝对时间轴上的起点（ChunkPipeline sink 的 start）。 */
+    private static final class WaveBlock {
+        final short[] pcm;
+        final long start;
+        WaveBlock(short[] pcm,long start){this.pcm=pcm;this.start=start;}
+    }
 
     private int logCount = 0;
     private long sDumpLeft = Engine.SR_OUT * 4;

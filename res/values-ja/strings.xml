@@ -358,4 +358,6 @@
     <string name="ui_volume_limit">出力音量を制限</string>
     <string name="ui_volume_limit_file_hint">初期設定はオフ。ノイズ低減と独立し、約20ミリ秒の出力RMSを元の入力以下、ピークを1以下に制限します。 一括変換とクイック録音にも適用します。</string>
     <string name="ui_volume_limit_live_hint">初期設定はオフ。ノイズ低減と独立し、約20ミリ秒の出力RMSを元の入力以下、ピークを1以下に制限します。 変更は次回のリアルタイム変換開始時に反映します。</string>
+    <string name="ov_wave_switch">入出力波形バー</string>
+    <string name="ov_wave_need_permission">波形バーの表示にはオーバーレイ権限が必要です</string>
 </resources>

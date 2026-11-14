@@ -358,4 +358,6 @@
     <string name="ui_volume_limit">Limit output volume</string>
     <string name="ui_volume_limit_file_hint">Off by default, independent of denoising. Output RMS over about 20 ms stays at or below the original input; peak stays at or below 1. Also applies to batch conversion and quick recording.</string>
     <string name="ui_volume_limit_live_hint">Off by default, independent of denoising. Output RMS over about 20 ms stays at or below the original input; peak stays at or below 1. Changes apply when live conversion next starts.</string>
+    <string name="ov_wave_switch">Input / output waveforms</string>
+    <string name="ov_wave_need_permission">Overlay permission is required for the waveform strip</string>
 </resources>

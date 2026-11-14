@@ -280,7 +280,13 @@ public final class Vmic {
         }
     }
 
-    /** 输入 44100Hz 的 short 样本，内部重采样到 48000 写进注入 AudioTrack */
+    /**
+     * 输入 44100Hz 的 short 样本，内部重采样到 48000 写进注入 AudioTrack。
+     *
+     * <p>这里只统计“写进注入 sink 的字节数”。helper 侧没有把 AudioTrack 的
+     * getPlaybackHeadPosition（更别说接收 App 的读取量）回传上来，所以辅助条把它标成
+     * “vmic write”写入游标，不当成播放进度，也不做任何估计。
+     */
     public static synchronized void feed44k(short[] in, int n) {
         feed44k(in, 0, n);
     }

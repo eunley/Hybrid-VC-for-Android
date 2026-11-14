@@ -358,4 +358,6 @@
     <string name="ui_volume_limit">限制输出音量</string>
     <string name="ui_volume_limit_file_hint">默认关闭，独立于降噪。约20毫秒输出RMS不超过对应原始输入，峰值不超过1。 批量转换与快捷录音也使用此设置。</string>
     <string name="ui_volume_limit_live_hint">默认关闭，独立于降噪。约20毫秒输出RMS不超过对应原始输入，峰值不超过1。 启动时固定设置，下次启动实时变声生效。</string>
+    <string name="ov_wave_switch">双波形辅助条（输入/输出）</string>
+    <string name="ov_wave_need_permission">需要悬浮窗权限才能显示波形辅助条</string>
 </resources>

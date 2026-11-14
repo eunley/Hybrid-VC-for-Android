@@ -358,4 +358,6 @@
     <string name="ui_volume_limit">Limitar volume de saída</string>
     <string name="ui_volume_limit_file_hint">Desativado por padrão, independente do ruído. RMS em cerca de 20 ms limitado à entrada original; pico máximo 1. Também vale para lotes e gravação rápida.</string>
     <string name="ui_volume_limit_live_hint">Desativado por padrão, independente do ruído. RMS em cerca de 20 ms limitado à entrada original; pico máximo 1. Alterações no próximo início da conversão em tempo real.</string>
+    <string name="ov_wave_switch">Formas de onda entrada / saída</string>
+    <string name="ov_wave_need_permission">É necessária permissão de sobreposição para a faixa de ondas</string>
 </resources>
